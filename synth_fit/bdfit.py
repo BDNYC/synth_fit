@@ -13,10 +13,10 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
 import emcee
-from emcee_plot import emcee_plot 
+
+from synth_fit.plotting.emcee_plot import emcee_plot 
 # https://github.com/adrn/streams/blob/master/streams/plot/emcee.py
 # Want to update ^ so it shows the burn_in cut
-
 from synth_fit.plotting import triangle
 from make_model import *
 from calc_chisq import *
