@@ -116,6 +116,10 @@ class BDSampler(object):
             title for any plots created; also used as part of filenames for 
             output files. If none is provided, object name and date are used
 
+        wavelength_bins: array-like, astropy.units Quantity
+            (default = [0.9,1.4,1.9,2.5]*u.um)
+            edges of the bins for normalizing regions separately
+            use an empty array to normalize the entire spectrum simultaneously
 
         """
 

@@ -61,6 +61,13 @@ bdsamp = synth_fit.bdfit.BDSampler(object_name,
 #this isn't enough for real results, just to make sure it runs
 bdsamp.mcmc_go(nwalk_mult=2,nstep_mult=10)
 
+# bdsamp.cropchain includes all the steps from all walkers after the burn-in
+# use np.percentile to get 16th, 50th, and 84th quantiles for each parameter
+# that's most likely value and uncertainties
+# or use triangle.py (either DFM's original version or my edited version in
+# synth_fit.plotting)
+# synth_fit.plotting.emcee_plot has a function that will plot all the chains
+
 logging.info("ran MCMC")
 
 logging.info("all done!")
