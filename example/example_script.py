@@ -13,6 +13,7 @@ logging.basicConfig(level=logging.INFO)
 
 # load the database - replace with appropriate path
 db = BDdb.get_db('/home/stephanie/Dropbox/BDNYC_new.db')
+#db = BDdb.get_db('/home/stephanie/Dropbox/BDNYCdb/BDNYC.db')
 
 object_name = '0036+1821'
 
@@ -41,6 +42,7 @@ infile.close()
 
 # change into astropy units quantities
 model['fsyn'] = model['fsyn']*(u.erg / (u.AA * u.cm**2 * u.s))
+model['wsyn'] = model['wsyn']*(u.um)
 
 params = ['logg', 'fsed', 'teff']
 
