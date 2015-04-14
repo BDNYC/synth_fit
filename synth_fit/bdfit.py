@@ -267,7 +267,7 @@ class BDSampler(object):
 
         ## Save the chains to a pkl file for any diagnostics
         if outfile==None:
-            outfile='{}_chains.pkl'.format(self.plot_title)
+            outfile='{}_chains.pkl'.format(self.plot_title.replace(" ","_"))
         open_outfile = open(outfile,'wb')
         cPickle.dump(self.chain,open_outfile)
         open_outfile.close()
