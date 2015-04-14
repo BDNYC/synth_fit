@@ -115,16 +115,16 @@ class ModelGrid(object):
 
         ## check that the input model dictionary is formatted correctly
         if ('wsyn' in self.mod_keys)==False:
-            logging.info("ERROR! model wavelength array must be keyed with 'wsyn'!")
+            raise TypeError("model wavelength array must be keyed with 'wsyn'!")
         if ('fsyn' in self.mod_keys)==False:
-            logging.info("ERROR! model flux must be keyed with 'fsyn'!")
+            raise TypeError("model flux must be keyed with 'fsyn'!")
         if ((type(self.model['wsyn'])!=u.quantity.Quantity) |
             (type(self.model['fsyn'])!=u.quantity.Quantity) |
             (type(spectrum['wavelength'])!=u.quantity.Quantity) |
             (type(spectrum['flux'])!=u.quantity.Quantity) |
             (type(spectrum['unc'])!=u.quantity.Quantity)):
-            logging.info("ERROR! model arrays and spectrum arrays must all"
-                + " be of type astropy.units.quantity.Quantity")
+            raise TypeError("model arrays and spectrum arrays must all"
+                            " be of type astropy.units.quantity.Quantity")
 
         ## Note that the ndim here is just for the MODEL, not everything being fit
         self.params = params
@@ -137,7 +137,7 @@ class ModelGrid(object):
         self.plims = {}
         for p in self.params:
             if (p in self.mod_keys)==False:
-                logging.info('ERROR! parameter %s not found!',p)
+                raise ValueError("ERROR! parameter {} not found!".format(p))
             else:
                 self.plims[p] = {'vals':np.asarray(self.model[p])}
                 self.plims[p]['min'] = min(self.plims[p]['vals'])
@@ -244,13 +244,8 @@ class ModelGrid(object):
             mod_flux = self.interp_models(model_p)
 
         # if the model isn't found, interp_models returns an array of -99s
-#        logging.debug(str(type(mod_flux)))
-#        logging.debug(str(mod_flux.dtype))
-#        logging.debug(mod_flux)
         if sum(mod_flux.value)<0: 
             return -np.inf
-
-#        mod_flux = mod_flux*normalization
 
         # On the advice of Dan Foreman-Mackey, I'm changing the calculation
         # of lnprob.  The additional uncertainty/tolerance needs to be 
@@ -261,16 +256,10 @@ class ModelGrid(object):
         logging.debug("type unc {} s {} n {}".format(self.unc.value.dtype,
             type(s.value),type(normalization)))
         unc_sq = (self.unc**2 + s**2)  * normalization**2 
-#        unc_sq = (self.unc**2) * normalization**2
-#        logging.debug("unc_sq {}".format(unc_sq))
         logging.debug("units f {} mf {}".format(self.flux.unit,
             mod_flux.unit))
         flux_pts = (self.flux-mod_flux*normalization)**2/unc_sq
         width_term = np.log(2*np.pi*unc_sq.value)
-#        logging.debug("flux+pts {}".format(flux_pts))
-#        logging.debug("width_term {} flux pts {} units fp {}".format(
-#            np.sum(width_term),np.sum(flux_pts),flux_pts.unit))
-        #logging.debug("units wt {}".format(width_term.unit))
         lnprob = -0.5*(np.sum(flux_pts + width_term))
         logging.debug('p {} lnprob {}'.format(str(args),str(lnprob)))
         return lnprob
