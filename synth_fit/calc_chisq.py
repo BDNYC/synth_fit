@@ -32,7 +32,7 @@ def test_all(data_wave, data_flux, data_unc, model_dict, params,
     data_unc: array; astropy.units Quantity
 
     model_dict: dictionary
-        keys 'wsyn' and 'fsyn' should correspond to model wavelength and 
+        keys 'wavelength' and 'flux' should correspond to model wavelength and 
         flux arrays, and those should be astropy.units Quantities
         other keys should correspond to params
 
@@ -54,14 +54,14 @@ def test_all(data_wave, data_flux, data_unc, model_dict, params,
 
     #logging.debug(data_wave.unit.to_string('fits'))
     #logging.debug(data_unc.unit.to_string('fits'))
-    #logging.debug(model_dict['wsyn'].unit.to_string('fits'))
-    if data_wave.unit!=model_dict['wsyn'].unit:
+    #logging.debug(model_dict['wavelength'].unit.to_string('fits'))
+    if data_wave.unit!=model_dict['wavelength'].unit:
          logging.debug('changing units')
-         data_wave = data_wave.to(model_dict['wsyn'].unit)
+         data_wave = data_wave.to(model_dict['wavelength'].unit)
     #logging.debug(data_wave.unit.to_string('fits'))
 
-    if ((len(model_dict['wsyn'])==len(data_wave)) and 
-        (np.sum(model_dict['wsyn']-data_wave)<(model_dict['wsyn'].unit*1e-12))):
+    if ((len(model_dict['wavelength'])==len(data_wave)) and 
+        (np.sum(model_dict['wavelength']-data_wave)<(model_dict['wavelength'].unit*1e-12))):
         interp = False
         logging.info('calc_chisq.test_all: NO INTERPOLATION')
     else:
@@ -71,7 +71,7 @@ def test_all(data_wave, data_flux, data_unc, model_dict, params,
 
     ndim = len(params)
 
-    num_models = len(model_dict['fsyn'])
+    num_models = len(model_dict['flux'])
 
     chisq = np.ones(num_models)*(99e15)
 
@@ -79,15 +79,18 @@ def test_all(data_wave, data_flux, data_unc, model_dict, params,
 #        logging.debug('%d %d %f %f',i, num_models, model_dict['logg'][i], 
 #            model_dict['teff'][i])
         if smooth:
-            mod_flux = falt2(model_dict['wsyn'],model_dict['fsyn'][i],resolution)
+            mod_flux = falt2(model_dict['wavelength'],model_dict['flux'][i],resolution)
         else:
-            mod_flux = model_dict['fsyn'][i]
-            #logging.debug('shape fsyn {} mf {}'.format(np.shape(model_dict['fsyn']), np.shape(mod_flux)))
-
+            mod_flux = model_dict['flux'][i]
+            mod_wave = model_dict['wavelength'][i]
+            #logging.debug('shape flux {} mf {}'.format(np.shape(model_dict['flux']), np.shape(mod_flux)))
+        mod_flux = np.asarray(mod_flux,dtype=np.float64)
+        mod_wave = np.asarray(mod_wave,dtype=np.float64)
         #logging.debug('lengths dw {} modw {} modf {}'.format(
-        #    len(data_wave),len(model_dict['wsyn']),len(mod_flux)))
+        #    len(data_wave),len(model_dict['wavelength']),len(mod_flux)))
         if interp:
-            mod_flux = np.interp(data_wave,model_dict['wsyn'],mod_flux)
+            data_wave = np.asarray(data_wave,dtype=np.float64)
+            mod_flux = np.interp(data_wave,mod_wave,mod_flux)
 
 #        logging.debug(str(mod_flux[100:110]))
 #        logging.debug('stdev %f', np.std(mod_flux))

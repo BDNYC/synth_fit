@@ -8,7 +8,7 @@ import logging
 
 ## Third-party
 import matplotlib
-matplotlib.use('agg')
+# matplotlib.use('agg')																		# For a cluster, so plots don't pop up as you go
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
@@ -116,7 +116,6 @@ class BDSampler(object):
             title for any plots created; also used as part of filenames for 
             output files. If none is provided, object name and date are used
 
-
         """
 
         ## date string to version output files for a particular run
@@ -148,8 +147,7 @@ class BDSampler(object):
 
         ## Calculate starting parameters for the emcee walkers 
         ## by minimizing chi-squared just using the grid of synthetic spectra
-        self.start_p = test_all(spectrum['wavelength'],spectrum['flux'],
-            spectrum['unc'], model, params,smooth=smooth)
+        self.start_p = test_all(spectrum['wavelength'],spectrum['flux'], spectrum['unc'], model, params,smooth=smooth)
         for i in range(self.model_ndim):
             if (self.start_p[i]>=self.model.plims[params[i]]['max']):
                 self.start_p[i] = self.start_p[i]*0.95
