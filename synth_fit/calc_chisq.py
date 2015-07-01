@@ -52,13 +52,16 @@ def test_all(data_wave, data_flux, data_unc, model_dict, params,
 
     """
 
-    #logging.debug(data_wave.unit.to_string('fits'))
-    #logging.debug(data_unc.unit.to_string('fits'))
-    #logging.debug(model_dict['wavelength'].unit.to_string('fits'))
+    logging.debug("STARTING CALC CHISQ")
+    logging.debug(data_wave.unit.to_string('fits'))
+    logging.debug(data_unc.unit.to_string('fits'))
+    logging.debug(model_dict['wavelength'].unit.to_string('fits'))
     if data_wave.unit!=model_dict['wavelength'].unit:
          logging.debug('changing units')
          data_wave = data_wave.to(model_dict['wavelength'].unit)
-    #logging.debug(data_wave.unit.to_string('fits'))
+    logging.debug(data_wave.unit.to_string('fits'))
+    logging.debug(model_dict['wavelength'].shape)
+    logging.debug(model_dict['wavelength'][0])
 
     if ((len(model_dict['wavelength'])==len(data_wave)) and 
         (np.sum(model_dict['wavelength']-data_wave)<(model_dict['wavelength'].unit*1e-12))):
@@ -83,6 +86,7 @@ def test_all(data_wave, data_flux, data_unc, model_dict, params,
         else:
             mod_flux = model_dict['flux'][i]
             mod_wave = model_dict['wavelength'][i]
+            print mod_wave
             #logging.debug('shape flux {} mf {}'.format(np.shape(model_dict['flux']), np.shape(mod_flux)))
         mod_flux = np.asarray(mod_flux,dtype=np.float64)
         mod_wave = np.asarray(mod_wave,dtype=np.float64)
@@ -90,6 +94,8 @@ def test_all(data_wave, data_flux, data_unc, model_dict, params,
         #    len(data_wave),len(model_dict['wavelength']),len(mod_flux)))
         if interp:
             data_wave = np.asarray(data_wave,dtype=np.float64)
+            print type(data_wave), type(mod_wave),type(mod_flux)
+            print data_wave.shape,mod_wave.shape,mod_flux.shape
             mod_flux = np.interp(data_wave,mod_wave,mod_flux)
 
 #        logging.debug(str(mod_flux[100:110]))

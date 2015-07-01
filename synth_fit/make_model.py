@@ -621,7 +621,10 @@ class ModelGrid(object):
         if self.interp:
             logging.debug('starting interp {} {} {}'.format(len(self.wave),
                 len(self.model['wavelength']),len(mod_flux)))
-            mod_flux = np.interp(self.wave,self.model['wavelength'],mod_flux)
+            # This p_loc[0] nesting issue should eventually be dealt with
+            # so it should be moved somewhere else and made a test
+            logging.debug(self.model['wavelength'][p_loc][0])
+            mod_flux = np.interp(self.wave,self.model['wavelength'][p_loc][0],mod_flux)
             logging.debug('finished interp')
 
         mod_flux = self.normalize_model(mod_flux)

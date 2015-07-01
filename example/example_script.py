@@ -1,4 +1,4 @@
-## Example script for synth_fit
+## START HERE FOR M
 
 import logging
 import cPickle
@@ -8,23 +8,25 @@ import synth_fit
 import synth_fit.bdfit
 import numpy as np
 
-mg=BDdb.get_db('/Users/paigegiorla/Code/Python/BDNYC/model_atmospheres.db').dict.execute("Select * from bt_settl_2013").fetchall()
-mg={'id':np.array([i[0] for i in mg]),
-	'teff':np.array([i[1] for i in mg]),
-	'logg':np.array([i[2] for i in mg]),
-	'wavelength':np.array([np.array(i[4],dtype=np.float64) for i in mg]),
-	'flux':np.array([np.array(i[5],dtype=np.float64) for i in mg])}	
 
-def fit_spectrum(raw_spectrum,model_grid=mg,object_name=''):
+db=BDdb.get_db('/Users/paigegiorla/Code/Python/BDNYC/model_atmospheres.db')
+mg=db.dict.execute("Select * from marley_saumon where teff between 1700 and 1900").fetchall()
+mg={'id':np.array([row['id'] for row in mg]),
+	'teff':np.array([row['teff'] for row in mg]),
+	'logg':np.array([row['logg'] for row in mg]),
+	'wavelength':np.array([np.array(row['wavelength'],dtype=np.float64) for row in mg]),
+	'flux':np.array([np.array(row['flux'],dtype=np.float64) for row in mg])}	
+	
+def fit_spectrum(raw_spectrum,model_grid=mg):
 	'''raw_spectrum requires units! Must be astropy quantities.
 	'''
 
-	logging.basicConfig(level=logging.INFO)
+	logging.basicConfig(level=logging.DEBUG)
 
 	# load the database - replace with appropriate path
 	
 	# object_name = '0036+1821'
-	# object_name = 86
+	object_name = 1580
 
 	if isinstance(raw_spectrum,(float,int)):
 		db=BDdb.get_db('/Users/paigegiorla/Desktop/PG_DB_2_16_15.db')
@@ -49,6 +51,9 @@ def fit_spectrum(raw_spectrum,model_grid=mg,object_name=''):
 	# infile = open("SpeX_marley_nolowg.pkl","rb")
 	# model = cPickle.load(infile)
 	# infile.close()
+	
+	logging.debug(model_grid['wavelength'].shape)
+	logging.debug(model_grid['wavelength'])
 
 	# change into astropy units quantities
 	model_grid['flux'] = (u.erg/u.AA/u.cm**2/u.s)*model_grid['flux']
