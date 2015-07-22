@@ -10,9 +10,9 @@ def showme(model_name,n,m):
 	
 	'''
 	#create the file to write the dictionary to
-	outfile=file('/Users/paigegiorla/Code/Python/BDNYC/synth_fit/model_dict/'+'{}'.format(model_name)+'.txt', 'w')
+	outfile=file('/Users/paigegiorla/Code/Python/BDNYC/synth_fit/model_dict/'+'_{}'.format(model_name)+'.txt', 'w')
 	
-	#pull everything out of the database for the model grid you choose
+	#pull everything out of the database for the model grid you chose
 	models=ma_db.dict.execute("select * from {}".format(model_name)).fetchall()
 	
 	logg_max=max(models['logg']

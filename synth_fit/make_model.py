@@ -551,9 +551,9 @@ class ModelGrid(object):
 #            logging.debug("mod_p {} p_val {}".format(mod_params,p_values))
             mod_difference = abs(np.array(mod_params) - np.array(p_values))
             check_distance = np.average(mod_difference)
-            if check_distance==min_distance:
-                logging.debug("MULTIPLE MODELS FOUND {}".format(p_values))
-            elif check_distance<min_distance:
+#             if check_distance==min_distance:
+#                 logging.debug("MULTIPLE MODELS FOUND {}".format(p_values))
+            if check_distance<min_distance:
                 min_distance = check_distance
                 matched_i = i
             else:

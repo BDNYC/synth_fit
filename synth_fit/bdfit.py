@@ -1,6 +1,9 @@
 # Module containing functions for working with emcee and running mcmc
 # and plotting the output
 # Stephanie Douglas
+
+# commented out all logging calls
+# Paige Giorla
 ################################################################################
 
 import datetime
@@ -124,7 +127,7 @@ class BDSampler(object):
 
         self.snap = snap
         self.name = obj_name
-        logging.info('%s',self.name)
+        #logging.info('%s',self.name)
 
         ## If no plot_title is provided, create one
         if plot_title=='None':
@@ -138,11 +141,11 @@ class BDSampler(object):
         self.model = ModelGrid(spectrum,model,params,smooth=smooth,
              snap=snap,wavelength_bins=wavelength_bins)
         #print spectrum.keys()
-        logging.info('Set model')
+        #logging.info('Set model')
 
         ## Calculate the number of parameters for the atmospheric model
         self.model_ndim = len(params)
-        logging.info('{} params {}'.format(self.model_ndim,
+        #logging.info('{} params {}'.format(self.model_ndim,
             str(params)))
 
         ## Calculate starting parameters for the emcee walkers 
@@ -170,13 +173,13 @@ class BDSampler(object):
         # add (log of) tolerance parameter
         good_unc = np.where(np.isnan(self.model.unc)==False)[0]
         start_lns = np.log(2.0*np.average(self.model.unc[good_unc]))
-        logging.info('starting ln(s)={} s={}'.format(start_lns,
+        #logging.info('starting ln(s)={} s={}'.format(start_lns,
             np.exp(start_lns)))
         self.start_p = np.append(self.start_p,start_lns)
         self.all_params.append("ln(s)".format(i))
 
-        logging.info('All params %s', str(self.all_params))
-        logging.info('Set starting params %s', str(self.start_p))
+        #logging.info('All params %s', str(self.all_params))
+        #logging.info('Set starting params %s', str(self.start_p))
 
         ## The total number of dimensions for the fit is the number of
         ## parameters for the model plus any additional parameters added above
@@ -206,38 +209,38 @@ class BDSampler(object):
         """
 
         nwalkers, nsteps = self.ndim*nwalk_mult, self.ndim*nstep_mult
-        logging.info('%d walkers, %d steps', nwalkers, nsteps)
+        #logging.info('%d walkers, %d steps', nwalkers, nsteps)
 
         ## Initialize the walkers in a gaussian ball around start_p
         ## start_p was set in __init, with the minimum chi-squared model
         ## plus any additional parameters
         p0 = np.zeros((nwalkers,self.ndim))
-        logging.debug('p0 shape %s',str(np.shape(p0)))
+        #logging.debug('p0 shape %s',str(np.shape(p0)))
         for i in range(nwalkers):
              p0[i] = self.start_p + (1e-2*np.random.randn(self.ndim)*
                   self.start_p)
-             logging.debug('p0[%s] shape %s',i,str(p0[i]))
+             #logging.debug('p0[%s] shape %s',i,str(p0[i]))
 
         ## Set up the sampler
         sampler = emcee.EnsembleSampler(nwalkers,self.ndim,self.model)
-        logging.info('sampler set')
+        #logging.info('sampler set')
 
         ## Burn in the walkers
         pos, prob, state = sampler.run_mcmc(p0,nsteps/10)
-        logging.debug('pos %s', str(pos))
-        logging.debug('prob %s', str(prob))
-        logging.debug('state %s', str(state))
+        #logging.debug('pos %s', str(pos))
+        #logging.debug('prob %s', str(prob))
+        #logging.debug('state %s', str(state))
 
         ## Reset the walkers, so the burn-in steps aren't included in analysis
         ## Now the walkers start at the position from the end of the burn-in
         ## Then run the actual MCMC run
         sampler.reset()
-        logging.info('sampler reset')
+        #logging.info('sampler reset')
         pos,prob,state = sampler.run_mcmc(pos,nsteps)
-        logging.info('sampler completed')
-        logging.info("avg accept {}".format(np.average(
+        #logging.info('sampler completed')
+        #logging.info("avg accept {}".format(np.average(
             sampler.acceptance_fraction)))
-        #logging.info("avg autocorrelation length {}".format(np.average(
+        ##logging.info("avg autocorrelation length {}".format(np.average(
         #    sampler.acor)))
 
         ## store chains for plotting/analysis
@@ -252,12 +255,12 @@ class BDSampler(object):
 
         if self.snap:
             chain_shape = np.shape(self.chain[:,burn_in:,:])
-            logging.debug("starting to snap {}".format(chain_shape))
+            #logging.debug("starting to snap {}".format(chain_shape))
             self.cropchain = self.model.snap_full_run(self.cropchain)
-            logging.debug("Snapped cropchains {} to {}".format(
+            #logging.debug("Snapped cropchains {} to {}".format(
                 chain_shape,np.shape(self.cropchain)))
             self.chain = self.cropchain.reshape(chain_shape)
-            logging.debug("Snapped chains")
+            #logging.debug("Snapped chains")
 
         ## Save the chains to a pkl file for any diagnostics
         if outfile==None:

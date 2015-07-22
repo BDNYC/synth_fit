@@ -10,12 +10,15 @@ import numpy as np
 
 
 db=BDdb.get_db('/Users/paigegiorla/Code/Python/BDNYC/model_atmospheres.db')
-mg=db.dict.execute("Select * from marley_saumon where teff between 1700 and 1900").fetchall()
+mg=db.dict.execute("Select * from marley_saumon").fetchall()
 mg={'id':np.array([row['id'] for row in mg]),
 	'teff':np.array([row['teff'] for row in mg]),
 	'logg':np.array([row['logg'] for row in mg]),
 	'wavelength':np.array([np.array(row['wavelength'],dtype=np.float64) for row in mg]),
 	'flux':np.array([np.array(row['flux'],dtype=np.float64) for row in mg])}	
+# change into astropy units quantities
+mg['flux'] = (u.erg/u.AA/u.cm**2/u.s)*mg['flux']
+mg['wavelength'] = (u.um)*mg['wavelength']
 	
 def fit_spectrum(raw_spectrum,model_grid=mg):
 	'''raw_spectrum requires units! Must be astropy quantities.
@@ -55,9 +58,6 @@ def fit_spectrum(raw_spectrum,model_grid=mg):
 	logging.debug(model_grid['wavelength'].shape)
 	logging.debug(model_grid['wavelength'])
 
-	# change into astropy units quantities
-	model_grid['flux'] = (u.erg/u.AA/u.cm**2/u.s)*model_grid['flux']
-	model_grid['wavelength'] = (u.um)*model_grid['wavelength']
 	params = [i for i in model_grid.keys() if i in ['logg', 'teff', 'f_sed', 'k_zz']]
 
 	# now set up the sampler object (it's a wrapper around emcee)
