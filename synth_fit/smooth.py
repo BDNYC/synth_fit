@@ -136,7 +136,7 @@ def variable_smooth(w, f, data_wave, delta_pixels=2, res_scale=1):
     model_res = w[1]-w[0]
 
     dlen = len(data_wave)
-    print data_wave.unit
+    # print data_wave.unit
 
     # new empty flux array
     new_flux = np.zeros(dlen)

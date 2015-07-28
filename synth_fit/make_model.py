@@ -136,7 +136,7 @@ class ModelGrid(object):
         ## along with making sure the parameter values are in numpy arrays
         self.plims = {}
         for p in self.params:
-            print self.model[p]
+            # print self.model[p]
             if (p in self.mod_keys)==False:
                 logging.info('ERROR! parameter %s not found!',p)
             else:
