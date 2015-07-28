@@ -278,7 +278,7 @@ class BDSampler(object):
 		Calls Adrian's code to plot the development of the chains
 		as well as 1D histograms of the results
 		"""
-		self.chain_fig = emcee_plot(self.chain,labels=self.all_params)
+		self.chain_fig = emcee_plot.emcee_plot(self.chain,labels=self.all_params)
 		plt.suptitle(self.plot_title)
 
 
