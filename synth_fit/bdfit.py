@@ -263,6 +263,7 @@ class BDSampler(object):
 		## Reshape the chains (don't need to crop out burn-in b/c that's done)
 		## This makes one array with all the samples for each parameter
 		self.cropchain = sampler.chain.reshape((-1,self.ndim))
+		self.get_quantiles()
 
 	def plot_triangle(self):
 		"""
@@ -291,7 +292,6 @@ class BDSampler(object):
 		xsorted = sorted(x)
 		qvalues = [xsorted[int(q * len(xsorted))] for q in quantiles]
 		return zip(quantiles,qvalues)
-
 
 	def get_quantiles(self):
 		""" calculates (16th, 50th, 84th) quantiles for all parameters """
