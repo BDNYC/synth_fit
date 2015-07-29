@@ -254,11 +254,11 @@ class BDSampler(object):
 			#logging.debug("Snapped chains")
 
 		## Save the chains to a pkl file for any diagnostics
-		if outfile==None:
-			outfile='{}_chains.pkl'.format(self.plot_title)
-		open_outfile = open(outfile,'wb')
-		cPickle.dump(self.chain,open_outfile)
-		open_outfile.close()
+		if outfile:
+			outfile=outfile+'{}_chains.pkl'.format(self.plot_title)
+			open_outfile = open(outfile,'wb')
+			cPickle.dump(self.chain,open_outfile)
+			open_outfile.close()
 
 		## Reshape the chains (don't need to crop out burn-in b/c that's done)
 		## This makes one array with all the samples for each parameter
