@@ -7,7 +7,7 @@ import BDdb
 import synth_fit
 import synth_fit.bdfit
 import numpy as np
-
+from matplotlib import pyplot as plt
 
 db=BDdb.get_db('/Users/paigegiorla/Code/Python/BDNYC/model_atmospheres.db')
 mg=db.dict.execute("Select * from bt_settl_2013 where teff between 900 and 1700").fetchall()
@@ -21,7 +21,7 @@ mg['flux'] = (u.erg/u.AA/u.cm**2/u.s)*mg['flux']
 mg['wavelength'] = (u.um)*mg['wavelength']
 print mg['flux']
 
-def fit_spectrum(raw_spectrum,model_grid=mg):
+def fit_spectrum(raw_spectrum,object_name,model_grid=mg):
 	'''raw_spectrum requires units! Must be astropy quantities.
 	'''
 
@@ -30,7 +30,7 @@ def fit_spectrum(raw_spectrum,model_grid=mg):
 	# load the database - replace with appropriate path
 	
 	# object_name = '0036+1821'
-	object_name = 1580
+# 	object_name = 1580
 
 	if isinstance(raw_spectrum,(float,int)):
 		db=BDdb.get_db('/Users/paigegiorla/Desktop/PG_DB_2_16_15.db')
@@ -74,11 +74,12 @@ def fit_spectrum(raw_spectrum,model_grid=mg):
 									   snap=True) # no interpolation on grid
 
 	#this isn't enough for real results, just to make sure it runs
-	bdsamp.mcmc_go(nwalk_mult=100,nstep_mult=1000)
+	bdsamp.mcmc_go(nwalk_mult=2,nstep_mult=10)
 
 	bdsamp.plot_triangle()
-# 	bdsamp.plot_chains()
-
+ 	plt.show()
+ 	bdsamp.plot_chains()
+	plt.show()
 	logging.info("ran MCMC")
 
 	logging.info("all done!")

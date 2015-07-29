@@ -318,3 +318,4 @@ class BDSampler(object):
 		self.error_and_unc[:,2] = (self.all_quantiles[:,1]-self.all_quantiles[:,0])
 
 		return self.error_and_unc
+>>>>>>> cb3ce10bd775ffaab2b84ef72c7ce5bfc607c715
