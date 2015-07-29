@@ -27,7 +27,7 @@ def make_model_db(model_grid_name, model_atmosphere_db):
 	
 	return mg
 
-def fit_spectrum(raw_spectrum, model_grid_name, walkers, steps, object_name='Test', log=False, plot=True, model_atmosphere_db='/Users/paigegiorla/Code/Python/BDNYC/model_atmospheres.db'):
+def fit_spectrum(raw_spectrum, model_grid_name, walkers, steps, object_name='Test', log=False, plot=True, prnt=True, model_atmosphere_db='/Users/paigegiorla/Code/Python/BDNYC/model_atmospheres.db'):
 	'''
 	Given **raw_spectrum** as an integer id from the SPECTRUM table or a [W,F,E] list with astropy units, 
 	returns a marginalized distribution plot of best fit parameters from the specified **model_grid_name**.
@@ -76,6 +76,8 @@ def fit_spectrum(raw_spectrum, model_grid_name, walkers, steps, object_name='Tes
 	
 	if log: logging.info("ran MCMC"); logging.info("all done!")
 	
-	print bdsamp.all_params
-	print bdsamp.all_quantiles.T[1]
+	if prnt:
+		print bdsamp.all_params
+		print bdsamp.all_quantiles.T[1]
+	
 	return bdsamp
