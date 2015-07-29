@@ -6,14 +6,16 @@ import synth_fit
 import synth_fit.bdfit
 import numpy as np
 
-def make_model_db(model_grid_name, model_atmosphere_db):
+def make_model_db(model_grid_name, model_atmosphere_db, param_lims=None):
 	'''
 	Given a **model_grid_name**, returns the grid from the model_atmospheres.db in the proper format to work with fit_spectrum()
 	'''
 	# Load the model_atmospheres database and pull all the data from the specified table
 	db = BDdb.get_db(model_atmosphere_db)
-	mg = db.dict.execute("Select * from {}".format(model_grid_name)).fetchall()
-	
+	if param_lims:
+		limit_text = ' AND '.join(['{} between {} and {}'.format(i,j,k) for i,j,k in param_lims])
+		mg = db.dict.execute("Select * from {} where {}".format(model_grid_name,limit_text)).fetchall()  
+	else: mg = db.dict.execute("Select * from {}".format(model_grid_name)).fetchall()
 	# Make a new dictionary with each parameter as an array of values
 	mg = {'id':np.array([row['id'] for row in mg]),
 	'teff':np.array([row['teff'] for row in mg]),
