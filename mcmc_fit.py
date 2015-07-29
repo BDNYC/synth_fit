@@ -27,17 +27,14 @@ def make_model_db(model_grid_name, model_atmosphere_db):
 	
 	return mg
 
-def fit_spectrum(raw_spectrum, model_grid_name, walkers, steps, object_name='Test', log=False, plot=True, prnt=True, model_atmosphere_db='/Users/paigegiorla/Code/Python/BDNYC/model_atmospheres.db',outfile=None):
+def fit_spectrum(raw_spectrum, model_grid, walkers, steps, object_name='Test', log=False, plot=True, prnt=True, outfile=None):
 	'''
 	Given **raw_spectrum** as an integer id from the SPECTRUM table or a [W,F,E] list with astropy units, 
 	returns a marginalized distribution plot of best fit parameters from the specified **model_grid_name**.
 	'''
 	
 	if log: logging.basicConfig(level=logging.DEBUG)
-	
-	# Turn the model_atmospheres.db grid into one that can talk to Steph's code
-	model_grid = make_model_db(model_grid_name, model_atmosphere_db)
-	
+		
 	# Input can be [W,F,E] or an id from the SPECTRUM table of the BDNYC Data Archive
 	if isinstance(raw_spectrum,(float,int)):
 		db = BDdb.get_db('/Users/paigegiorla/Desktop/PG_DB_2_16_15.db')

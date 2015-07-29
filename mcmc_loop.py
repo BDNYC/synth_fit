@@ -23,7 +23,9 @@ def showme():
 			done.append(i[1])
 # 			plt.savefig('/Users/paigegiorla/Code/Python/BDNYC/t_dwarfs/mcmc_fits/Marley_Saumon/triangle_plots/'+'{}_{}'.format(i[2],i[3])+'.pdf')
 
-		
+			# Turn the model_atmospheres.db grid into one that can talk to Steph's code
+	model_grid = make_model_db(model_grid_name, model_atmosphere_db)
+model_atmosphere_db='/Users/paigegiorla/Code/Python/BDNYC/model_atmospheres.db',
 		except ValueError: notworking.append(i[1])
 		except TypeError: notworking.append(i[1])
 # 		except UnitsError: notworking.append(i[1])
