@@ -269,8 +269,7 @@ class BDSampler(object):
 		"""
 		Calls triangle module to create a corner-plot of the results
 		"""
-		self.corner_fig = triangle.corner(self.cropchain,
-			labels=self.all_params,quantiles=[.16,.5,.84])#, truths=np.ones(3))
+		self.corner_fig = triangle.corner(self.cropchain, labels=self.all_params,quantiles=[.16,.5,.84], verbose=False)#, truths=np.ones(3))
 		plt.suptitle(self.plot_title)
 
 
