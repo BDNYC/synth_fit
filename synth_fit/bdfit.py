@@ -148,7 +148,7 @@ class BDSampler(object):
 
 		## Calculate starting parameters for the emcee walkers 
 		## by minimizing chi-squared just using the grid of synthetic spectra
-		self.start_p = test_all(spectrum['wavelength'],spectrum['flux'], spectrum['unc'], model, params,smooth=smooth)
+		self.start_p = test_all(spectrum['wavelength'], spectrum['flux'], spectrum['unc'], model, params, smooth=smooth)
 		for i in range(self.model_ndim):
 			if (self.start_p[i]>=self.model.plims[params[i]]['max']):
 				self.start_p[i] = self.start_p[i]*0.95
