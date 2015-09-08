@@ -1,52 +1,52 @@
 import logging, BDdb, cPickle, synth_fit, synth_fit.bdfit, astropy.units as q, utilities as u, numpy as np, matplotlib.pyplot as plt, pandas as pd
 	
-# def interp_models(params, coordinates, model_grid, smoothing=1):
-#   """
-#   Interpolation code that accepts a model grid and a list of parameters/values to return an interpolated spectrum.
-# 
-#   Parameters
-#   ----------
-#   params: list
-#       A list of the model parameters, e.g. ['teff', 'logg', 'f_sed']
-#   coordinates: list
-#       A list of the coordinates in parameter space to evaluate, e.g. [1643, 5.1, 2.3]
-#   model_grid: Pandas DataFrame
-#       A Pandas dataframe of the database
-#   
-#   Returns
-#   -------
-#   spectrum: list of arrays
-#        The wavelength and flux at the specified **values** in parameter space
-# 
-#   Notes
-#   -----
-#   You might have to update scipy and some other things to run this. Updating takes about 1.5 hours! Do:
-#   >>> ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
-#   >>> brew install gcc
-#   >>> pip install scipy --upgrade
-# 
-#   """
-#   from scipy.interpolate import LinearNDInterpolator
-#   
-#   # Transpose the Series of flux arrays into a Series of element-wise arrays of the flux at each wavelength point
-#   flux_columns = pd.Series(np.asarray(model_grid['flux'].tolist()).T.tolist())
-#   
-#   # Take out nusiance parameters and build parameter space from arrays
-#   grid = np.asarray(model_grid.loc[:,params]).T
-#   
-#   # Define the wavelength array and an empty flux array
-#   W, F = model_grid['wavelength'][0], np.zeros(len(model_grid['wavelength'][0]))
-#     
-#   # Interpolate to specified coordinates for each wavelength point in parameter space
-#   for n in range(len(F)):
-#     
-#     # Create grid interpolation function to pass coordinates to
-#     interpND = LinearNDInterpolator(grid.T, flux_columns[n], rescale=True)
-#   
-#     # Find flux value at desired coordinates in parameter space and insert into interpolated flux array
-#     F[n] = interpND(coordinates)
-#   
-#   return [W,u.smooth(F,smoothing) if smoothing else F]  
+def pd_interp_models(params, coordinates, model_grid, smoothing=1):
+  """
+  Interpolation code that accepts a model grid and a list of parameters/values to return an interpolated spectrum.
+
+  Parameters
+  ----------
+  params: list
+      A list of the model parameters, e.g. ['teff', 'logg', 'f_sed']
+  coordinates: list
+      A list of the coordinates in parameter space to evaluate, e.g. [1643, 5.1, 2.3]
+  model_grid: Pandas DataFrame
+      A Pandas dataframe of the database
+  
+  Returns
+  -------
+  spectrum: list of arrays
+       The wavelength and flux at the specified **values** in parameter space
+
+  Notes
+  -----
+  You might have to update scipy and some other things to run this. Updating takes about 1.5 hours! Do:
+  >>> ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+  >>> brew install gcc
+  >>> pip install scipy --upgrade
+
+  """
+  from scipy.interpolate import LinearNDInterpolator
+  
+  # Transpose the Series of flux arrays into a Series of element-wise arrays of the flux at each wavelength point
+  flux_columns = pd.Series(np.asarray(model_grid['flux'].tolist()).T.tolist())
+  
+  # Take out nusiance parameters and build parameter space from arrays
+  grid = np.asarray(model_grid.loc[:,params]).T
+  
+  # Define the wavelength array and an empty flux array
+  W, F = model_grid['wavelength'][0], np.zeros(len(model_grid['wavelength'][0]))
+    
+  # Interpolate to specified coordinates for each wavelength point in parameter space
+  for n in range(len(F)):
+    
+    # Create grid interpolation function to pass coordinates to
+    interpND = LinearNDInterpolator(grid.T, flux_columns[n], rescale=True)
+  
+    # Find flux value at desired coordinates in parameter space and insert into interpolated flux array
+    F[n] = interpND(coordinates)
+  
+  return [W,u.smooth(F,smoothing) if smoothing else F]  
   
 def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,700,50),('logg',3.5,5.5,0.5)], rebin_models=True, use_pandas=False):
   '''
@@ -111,7 +111,7 @@ def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,
   # Interpolate the grid to fill in the holes
   for h in grid_holes:
     print 'Filling grid hole at {}'.format(h)
-    new_spectrum = interp_models(params, h, models, smoothing=False)
+    new_spectrum = pd_interp_models(params, h, models, smoothing=False)
     new_row = {k:v for k,v in zip(params,h)}
     new_row.update({'wavelength':new_spectrum[0], 'flux':new_spectrum[1]})
     models.append(new_row, ignore_index=True)
@@ -181,7 +181,7 @@ def fit_spectrum(raw_spectrum, model_grid, walkers, steps, object_name='Test', l
 	# Plotting
 	if plot:
 	  bdsamp.plot_triangle()
-	  bdsamp.plot_chains()
+# 	  bdsamp.plot_chains()
 	
   # Printing
 	if log: logging.info("ran MCMC"); logging.info("all done!")
