@@ -1,4 +1,133 @@
 import logging, BDdb, cPickle, synth_fit, synth_fit.bdfit, astropy.units as q, utilities as u, numpy as np, matplotlib.pyplot as plt, pandas as pd
+	
+# def interp_models(params, coordinates, model_grid, smoothing=1):
+#   """
+#   Interpolation code that accepts a model grid and a list of parameters/values to return an interpolated spectrum.
+# 
+#   Parameters
+#   ----------
+#   params: list
+#       A list of the model parameters, e.g. ['teff', 'logg', 'f_sed']
+#   coordinates: list
+#       A list of the coordinates in parameter space to evaluate, e.g. [1643, 5.1, 2.3]
+#   model_grid: Pandas DataFrame
+#       A Pandas dataframe of the database
+#   
+#   Returns
+#   -------
+#   spectrum: list of arrays
+#        The wavelength and flux at the specified **values** in parameter space
+# 
+#   Notes
+#   -----
+#   You might have to update scipy and some other things to run this. Updating takes about 1.5 hours! Do:
+#   >>> ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+#   >>> brew install gcc
+#   >>> pip install scipy --upgrade
+# 
+#   """
+#   from scipy.interpolate import LinearNDInterpolator
+#   
+#   # Transpose the Series of flux arrays into a Series of element-wise arrays of the flux at each wavelength point
+#   flux_columns = pd.Series(np.asarray(model_grid['flux'].tolist()).T.tolist())
+#   
+#   # Take out nusiance parameters and build parameter space from arrays
+#   grid = np.asarray(model_grid.loc[:,params]).T
+#   
+#   # Define the wavelength array and an empty flux array
+#   W, F = model_grid['wavelength'][0], np.zeros(len(model_grid['wavelength'][0]))
+#     
+#   # Interpolate to specified coordinates for each wavelength point in parameter space
+#   for n in range(len(F)):
+#     
+#     # Create grid interpolation function to pass coordinates to
+#     interpND = LinearNDInterpolator(grid.T, flux_columns[n], rescale=True)
+#   
+#     # Find flux value at desired coordinates in parameter space and insert into interpolated flux array
+#     F[n] = interpND(coordinates)
+#   
+#   return [W,u.smooth(F,smoothing) if smoothing else F]  
+  
+def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,700,50),('logg',3.5,5.5,0.5)], rebin_models=True, use_pandas=False):
+  '''
+  Given a **model_grid_name**, returns the grid from the model_atmospheres.db as a Pandas DataFrame
+  
+  Parameters
+  ----------
+  model_grid_name: str
+    The name of the model grid table in the model_atmospheres.db SQL file, e.g. 'bt_settl_2013'
+  model_atmosphere_db: str
+    The path to model_atmospheres.db
+  param_lims: list of tuples (optional)
+    A list of tuples with the parameter name, lower limit, upper limit, and increment for each parameter to be constrained, e.g. [('teff',400,800,100),('logg',4,5,0.5)]
+  rebin_models: array or bool
+    The wavelength array to which all model spectra should be rebinned OR True if random rebinning is desired
+  
+  Returns
+  -------
+  models: Pandas DataFrame
+    The resulting model grid as a Pandas DataFrame
+  
+  '''
+  # Load the model_atmospheres database and pull all the data from the specified table
+  db = BDdb.get_db(model_atmosphere_db)
+  if param_lims:
+    limit_text = ' AND '.join(["({0} BETWEEN {1} AND {2})".format(l[0],l[1],l[2]) for l in param_lims])
+    model_grid = db.dict("SELECT * FROM {} WHERE (teff LIKE '%00' OR teff LIKE '%50') AND {}".format(model_grid_name,limit_text)).fetchall()  
+  else: model_grid = db.dict("SELECT * FROM {} WHERE (teff LIKE '%00' OR teff LIKE '%50')".format(model_grid_name)).fetchall()
+    
+  # Load the model atmospheres into a data frame and define the parameters
+  models = pd.DataFrame(model_grid)
+  params = [p for p in models.columns.values.tolist() if p in ['teff','logg','f_sed','k_zz']]
+  
+  # Choose template wavelength array to rebin all other spectra
+  W = rebin_models if isinstance(rebin_models,(list,np.ndarray)) else models['wavelength'][0]
+  
+  # Rebin model spectra
+  def rebin(row): return [i.value for i in u.rebin_spec([row['wavelength']*q.um, row['flux']*q.erg/q.s/q.cm**2/q.AA], W*q.um)][:2]
+  models['wavelength'], models['flux'] = [[i[n] for i in models.apply(rebin, axis=1)] for n in [0,1]]
+  models['flux'] = [u.smooth(f,1) for f in models['flux']]
+  
+  # Get the coordinates in parameter space of each grid point
+  coords = models.loc[:,params].values.tolist()
+  
+  # Find the holes in the grid based on the defined grid resolution without expanding the grid borders
+  def find_holes(coords):
+    coords = np.asanyarray(coords)
+    uniq, labels = zip(*[np.unique(c, return_inverse=True) for c in coords.T])
+    grid = np.zeros(map(len, uniq), bool)
+    grid[labels] = True
+    candidates = np.zeros_like(grid)
+    for dim in range(grid.ndim):
+      grid0 = np.rollaxis(grid, dim)
+      inside = np.logical_or.accumulate(grid0, axis=0) & np.logical_or.accumulate(grid0[::-1], axis=0)[::-1]
+      candidates |= np.rollaxis(inside, 0, dim+1)
+    holes = candidates & ~grid
+    hole_labels = np.where(holes)
+    return np.column_stack([u[h] for u, h in zip(uniq, hole_labels)])
+  
+  grid_holes = find_holes(coords)
+  
+  # Interpolate the grid to fill in the holes
+  for h in grid_holes:
+    print 'Filling grid hole at {}'.format(h)
+    new_spectrum = interp_models(params, h, models, smoothing=False)
+    new_row = {k:v for k,v in zip(params,h)}
+    new_row.update({'wavelength':new_spectrum[0], 'flux':new_spectrum[1]})
+    models.append(new_row, ignore_index=True)
+    
+  # Sort the DataFrame by teff and logg?
+  
+  # Turn Pandas DataFrame into a dictionary of arrays if not using Pandas
+  if not use_pandas:
+    models = {k:(q.erg/q.AA/q.cm**2/q.s if k=='flux' else 1)*models[k].values for k in models.columns.values}
+    models['wavelength'] = q.um*models['wavelength'][0]
+
+  return models
+
+# ===========================================================================================================================================
+# ===================================== Non-Pandas ==========================================================================================
+# ===========================================================================================================================================
 
 def fit_spectrum(raw_spectrum, model_grid, walkers, steps, object_name='Test', log=False, plot=True, prnt=True, outfile=None):
 	'''
@@ -44,7 +173,7 @@ def fit_spectrum(raw_spectrum, model_grid, walkers, steps, object_name='Test', l
 	params = [i for i in model_grid.keys() if i in ['logg', 'teff', 'f_sed', 'k_zz']]
 	
 	# Set up the sampler object (it's a wrapper around emcee)
-	bdsamp = synth_fit.bdfit.BDSampler(object_name, spectrum, model_grid,	params, smooth=False,	plot_title="{}, {}".format(object_name,"BT-Settl 2013"), snap=True) # smooth=False if model already matches data, snap=True if no interpolation is needed on grid
+	bdsamp = synth_fit.bdfit.BDSampler(object_name, spectrum, model_grid,	params, smooth=False,	plot_title="{}, {}".format(object_name,"BT-Settl 2013"), snap=False) # smooth=False if model already matches data, snap=True if no interpolation is needed on grid
 																				        
 	# Run the mcmc method
 	bdsamp.mcmc_go(nwalk_mult=walkers, nstep_mult=steps, outfile=outfile)
@@ -65,7 +194,7 @@ def fit_spectrum(raw_spectrum, model_grid, walkers, steps, object_name='Test', l
 	bdsamp.best_fit_spectrum = interp_models(bdsamp.all_params, bdsamp.all_quantiles.T[1], model_grid)
 	
 	return bdsamp
-	
+
 def interp_models(params, coordinates, model_grid, smoothing=1):
   """
   Interpolation code that accepts a model grid and a list of parameters/values to return an interpolated spectrum.
@@ -102,7 +231,7 @@ def interp_models(params, coordinates, model_grid, smoothing=1):
   grid = [model_grid.get(p) for p in params]
   
   # Define the wavelength array and an empty flux array
-  W, F = model_grid['wavelength'][0].value, np.zeros(len(flux_columns))
+  W, F = model_grid['wavelength'].value, np.zeros(len(flux_columns))
   
   # Interpolate to specified coordinates for each wavelength point in parameter space
   for n in range(len(flux_columns)):
@@ -115,69 +244,52 @@ def interp_models(params, coordinates, model_grid, smoothing=1):
   
   return [W,u.smooth(F,smoothing) if smoothing else F]
 
-def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,1200)], rebin_models=True, grid_resolution=[('teff',50),('logg',0.5)]):
-  '''
-  Given a **model_grid_name**, returns the grid from the model_atmospheres.db in the proper format to work with fit_spectrum()
-  '''
-  # Load the model_atmospheres database and pull all the data from the specified table
-  db = BDdb.get_db(model_atmosphere_db)
-  if param_lims:
-    limit_text = ' AND '.join(['{} between {} and {}'.format(i,j,k) for i,j,k in param_lims])
-    model_grid = db.dict("Select * from {} where {}".format(model_grid_name,limit_text)).fetchall()  
-  else: model_grid = db.dict("Select * from {}".format(model_grid_name)).fetchall()
-  
-  # Make a new dictionary with each parameter as an array of values
-  mg, wavelength, flux = {k:np.array([row.get(k) for row in model_grid]) for k in ['teff','logg','k_zz','f_sed'] if k in model_grid[0]}, [], []
-  
-  # Choose template wavelength array to rebin all other spectra
-  W = np.array(model_grid[0]['wavelength'], dtype=np.float64)
-  
-  # Pull out model spectra and rebin if necessary
-  for row in model_grid:
-    w, f, e = u.rebin_spec([np.array(row['wavelength'], dtype=np.float64)*q.um, np.array(row['flux'], dtype=np.float64)*q.erg/q.s/q.cm**2/q.AA], W*q.um) if rebin_models else [np.array(row['wavelength'], dtype=np.float64), np.array(row['flux'], dtype=np.float64), None]
-    wavelength.append(w), flux.append(f)
-    
-  for k in grid_resolution:
-    
-    # Define new axis for this parameter at the given resolution using the min and max of the existing grid as end points
-    # mg[k[0]+'_new'] = np.arange(min(mg[k[0]]),max(mg[k[0]]),k[1])
-    pass
-    
-    
-    # No no no. What I want to do is fill in a grid. For each missing point, I only want to fill it in if there is one above and below OR one left and right.
-    
-    #     o o o o o 
-    # o o x o x o o
-    # o x x o o
-    #   o o o o
-  
-  # Add astropy units and put spectra in the model grid
-  mg.update({'wavelength':(q.um)*np.array(wavelength), 'flux':(q.erg/q.AA/q.cm**2/q.s)*np.array(flux)})
-  
-  return mg
-	
-# def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,2500)], rebin_models=True, grid_resolution=[('teff',50),('logg',0.5)]):
+# def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,1200)], rebin_models=True, grid_resolution=[('teff',50),('logg',0.5)]):
 #   '''
 #   Given a **model_grid_name**, returns the grid from the model_atmospheres.db in the proper format to work with fit_spectrum()
 #   '''
 #   # Load the model_atmospheres database and pull all the data from the specified table
 #   db = BDdb.get_db(model_atmosphere_db)
 #   if param_lims:
-#     limit_text = ' AND '.join(['{} BETWEEN {} AND {}'.format(i,j,k) for i,j,k in param_lims])
-#     model_grid = db.dict("SELECT * FROM {} WHERE {}".format(model_grid_name,limit_text)).fetchall()  
-#   else: model_grid = db.dict("SELECT * FROM {}".format(model_grid_name)).fetchall()
-# 
-#   # Load the model atmospheres into a data frame
-#   models = pd.DataFrame(model_grid)
-# 
+#     limit_text = ' AND '.join(['{} between {} and {}'.format(i,j,k) for i,j,k in param_lims])
+#     model_grid = db.dict("Select * from {} where {}".format(model_grid_name,limit_text)).fetchall()  
+#   else: model_grid = db.dict("Select * from {}".format(model_grid_name)).fetchall()
+#   
+#   # Make a new dictionary with each parameter as an array of values
+#   mg, wavelength, flux = {k:np.array([row.get(k) for row in model_grid]) for k in ['teff','logg','k_zz','f_sed'] if k in model_grid[0]}, [], []
+#   
 #   # Choose template wavelength array to rebin all other spectra
-#   W = rebin_models if isinstance(rebin_models,(list,np.ndarray)) else models['wavelength'][0]
-# 
-#   # Rebin model spectra
-#   def rebin(row): return [i.value for i in u.rebin_spec([row['wavelength']*q.um, row['flux']*q.erg/q.s/q.cm**2/q.AA], W*q.um)][:2]
-#   models['wavelength'], models['flux'] = [[i[n] for i in models.apply(rebin, axis=1)] for n in [0,1]]
-# 
-#   return models
+#   W = np.array(model_grid[0]['wavelength'], dtype=np.float64)
+#   
+#   # Pull out model spectra and rebin if necessary
+#   for row in model_grid:
+#     w, f, e = u.rebin_spec([np.array(row['wavelength'], dtype=np.float64)*q.um, np.array(row['flux'], dtype=np.float64)*q.erg/q.s/q.cm**2/q.AA], W*q.um) if rebin_models else [np.array(row['wavelength'], dtype=np.float64), np.array(row['flux'], dtype=np.float64), None]
+#     wavelength.append(w), flux.append(f)
+#     
+#   # Add astropy units and put spectra in the model grid
+#   mg.update({'wavelength':(q.um)*np.array(wavelength), 'flux':(q.erg/q.AA/q.cm**2/q.s)*np.array(flux)})
+#   
+#   return mg
+
+# ============================================================================================================================================
+# ====================================================== TESTS ===============================================================================
+# ============================================================================================================================================
+
+def model_grid_smoothness_test(models, param_lims={'teff':(0,800), 'logg':(4.0,6.0)}, rebin_models=True):
+  '''
+  Given a **model_grid_name**, returns the grid from the model_atmospheres.db in the proper format to work with fit_spectrum()
+  '''
+  for g in list(set(models['logg'])):
+    plt.figure()
+    upper, lower = max(models[models['logg']==g]['teff']), min(models[models['logg']==g]['teff'])
+    cont = plt.contourf([[0,0],[0,0]], range(lower,upper+50,50), cmap=plt.cm.jet_r)
+    plt.clf()
+    for n,(t,f) in enumerate(zip(models[models['logg']==g]['teff'],models[models['logg']==g]['flux'])):
+      color = plt.cm.jet_r((1.*t-lower)/(upper-lower),1.)
+      plt.loglog(W, f, color=color)
+      plt.loglog(*interp_models(['teff','logg'], [t+25,g], models, smoothing=1), color=color, alpha=0.5)
+      plt.xlim(0.8,2.5), plt.ylim(1E-3,1E4)
+    plt.title('log(g) = {}'.format(g)), plt.colorbar(cont)
 
 def model_grid_interp_test(model_grid, teff, logg):
   '''

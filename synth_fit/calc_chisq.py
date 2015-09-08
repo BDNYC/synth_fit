@@ -79,27 +79,22 @@ def test_all(data_wave, data_flux, data_unc, model_dict, params,
     chisq = np.ones(num_models)*(99e15)
 
     for i in range(num_models):
-#        logging.debug('%d %d %f %f',i, num_models, model_dict['logg'][i], 
-#            model_dict['teff'][i])
+        logging.debug('%d %d %f %f',i, num_models, model_dict['logg'][i], model_dict['teff'][i])
         if smooth:
             mod_flux = falt2(model_dict['wavelength'],model_dict['flux'][i],resolution)
         else:
             mod_flux = model_dict['flux'][i]
-            mod_wave = model_dict['wavelength'][i]
-            # print mod_wave
-            #logging.debug('shape flux {} mf {}'.format(np.shape(model_dict['flux']), np.shape(mod_flux)))
+            mod_wave = model_dict['wavelength']
+            logging.debug('shape flux {} mf {}'.format(np.shape(model_dict['flux']), np.shape(mod_flux)))
         mod_flux = np.asarray(mod_flux,dtype=np.float64)
         mod_wave = np.asarray(mod_wave,dtype=np.float64)
-        #logging.debug('lengths dw {} modw {} modf {}'.format(
-        #    len(data_wave),len(model_dict['wavelength']),len(mod_flux)))
+        logging.debug('lengths dw {} modw {} modf {}'.format(len(data_wave),len(model_dict['wavelength']),len(mod_flux)))
         if interp:
             data_wave = np.asarray(data_wave,dtype=np.float64)
-            # print type(data_wave), type(mod_wave),type(mod_flux)
-            # print data_wave.shape,mod_wave.shape,mod_flux.shape
             mod_flux = np.interp(data_wave,mod_wave,mod_flux)
-
-#        logging.debug(str(mod_flux[100:110]))
-#        logging.debug('stdev %f', np.std(mod_flux))
+            
+        logging.debug(str(mod_flux[100:110]))
+        logging.debug('stdev %f', np.std(mod_flux))
         mult1 = data_flux*mod_flux
         bad = np.isnan(mult1)
         mult = np.sum(mult1[~bad])
@@ -109,10 +104,10 @@ def test_all(data_wave, data_flux, data_unc, model_dict, params,
         mod_flux = mod_flux*ck
 
         chisq[i] = calc_chisq(data_flux, data_unc, mod_flux)
-#        logging.debug('chisq %f', chisq[i])
+        logging.debug('chisq %f', chisq[i])
 
     min_loc = np.argmin(chisq)
-#    logging.debug('min_loc %d', min_loc)
+    logging.debug('min_loc %d', min_loc)
     best_params = np.array([])
     for p in params:
         best_params = np.append(best_params,model_dict[p][min_loc])

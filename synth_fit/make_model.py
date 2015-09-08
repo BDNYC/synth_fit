@@ -303,8 +303,8 @@ class ModelGrid(object):
         # Get the "edge values" - the grid values above and below
         # the desired values
         for i in range(self.ndim):
-            print self.params[i]
-            print self.plims[self.params[i]]['vals']
+            # print self.params[i]
+            # print self.plims[self.params[i]]['vals']
             if (p[i] in self.plims[self.params[i]]['vals']):
                 grid_edges[self.params[i]] = np.array([p[i]])
                 edge_inds[self.params[i]] = np.where(
@@ -369,7 +369,7 @@ class ModelGrid(object):
             if len(find_i)!=1:
                 logging.info('ERROR: Multi/No model {} {}'.format(cpar,find_i))
                 return np.ones(len(self.wave))*-99.0*self.flux.unit
-            print find_i
+            # print find_i
             corner_spectra[tuple(cpar)] = self.model['flux'][find_i]
 
         logging.debug('finished getting corner spectra')
@@ -397,7 +397,7 @@ class ModelGrid(object):
 
                 # There will be half as many spectra after this.  
                 new_corners = old_corners[:len(old_corners)/2,1:]
-                print 'new corners',new_corners
+                # print 'new corners',new_corners
                 new_spectra = {}
                 for cpar in new_corners:
                     logging.debug('new params {} {}'.format(cpar, type(cpar)))
@@ -418,16 +418,16 @@ class ModelGrid(object):
                 # No need to interpolate this variable, so skip it and
                 # copy the same spectra to a new dictionary with new indices
                 skip_var = old_corners[0,0]
-                print i,self.params[i],skip_var
+                # print i,self.params[i],skip_var
                 new_corners = old_corners[:,1:]
-                print new_corners
+                # print new_corners
                 new_spectra = {}
                 for cpar in new_corners:
                     new_spectra[tuple(cpar)] = old_spectra[tuple(np.append(
                         skip_var,cpar))]
                 old_corners = new_corners
                 old_spectra = new_spectra
-                print old_spectra.keys()
+                # print old_spectra.keys()
             else:
                 logging.debug('make_model WTF')
         mod_flux = old_spectra[()][0]
@@ -465,12 +465,10 @@ class ModelGrid(object):
         mult1 = self.flux*model_flux
         bad = np.isnan(mult1)
         mult = np.sum(mult1[~bad])
-        #print 'mult',mult                                 
         sq1 = model_flux**2
         square = np.sum(sq1[~bad])
-        #print 'sq',square                                 
         ck = mult/square
-        #print 'ck',ck                                     
+
         #Applying scaling factor to rescale model flux array
         model_flux = model_flux*ck
         logging.debug('finished renormalization') 
