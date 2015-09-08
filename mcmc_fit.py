@@ -244,33 +244,6 @@ def interp_models(params, coordinates, model_grid, smoothing=1):
   
   return [W,u.smooth(F,smoothing) if smoothing else F]
 
-# def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,1200)], rebin_models=True, grid_resolution=[('teff',50),('logg',0.5)]):
-#   '''
-#   Given a **model_grid_name**, returns the grid from the model_atmospheres.db in the proper format to work with fit_spectrum()
-#   '''
-#   # Load the model_atmospheres database and pull all the data from the specified table
-#   db = BDdb.get_db(model_atmosphere_db)
-#   if param_lims:
-#     limit_text = ' AND '.join(['{} between {} and {}'.format(i,j,k) for i,j,k in param_lims])
-#     model_grid = db.dict("Select * from {} where {}".format(model_grid_name,limit_text)).fetchall()  
-#   else: model_grid = db.dict("Select * from {}".format(model_grid_name)).fetchall()
-#   
-#   # Make a new dictionary with each parameter as an array of values
-#   mg, wavelength, flux = {k:np.array([row.get(k) for row in model_grid]) for k in ['teff','logg','k_zz','f_sed'] if k in model_grid[0]}, [], []
-#   
-#   # Choose template wavelength array to rebin all other spectra
-#   W = np.array(model_grid[0]['wavelength'], dtype=np.float64)
-#   
-#   # Pull out model spectra and rebin if necessary
-#   for row in model_grid:
-#     w, f, e = u.rebin_spec([np.array(row['wavelength'], dtype=np.float64)*q.um, np.array(row['flux'], dtype=np.float64)*q.erg/q.s/q.cm**2/q.AA], W*q.um) if rebin_models else [np.array(row['wavelength'], dtype=np.float64), np.array(row['flux'], dtype=np.float64), None]
-#     wavelength.append(w), flux.append(f)
-#     
-#   # Add astropy units and put spectra in the model grid
-#   mg.update({'wavelength':(q.um)*np.array(wavelength), 'flux':(q.erg/q.AA/q.cm**2/q.s)*np.array(flux)})
-#   
-#   return mg
-
 # ============================================================================================================================================
 # ====================================================== TESTS ===============================================================================
 # ============================================================================================================================================
