@@ -113,14 +113,15 @@ def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,
     print 'Filling grid hole at {}'.format(h)
     new_spectrum = pd_interp_models(params, h, models, smoothing=False)
     new_row = {k:v for k,v in zip(params,h)}
-    new_row.update({'wavelength':new_spectrum[0], 'flux':new_spectrum[1]})
+    new_row.update({'wavelength':new_spectrum[0], 'flux':new_spectrum[1], 'comments':'interpolated'})
     models.append(new_row, ignore_index=True)
     
   # Sort the DataFrame by teff and logg?
   
   # Turn Pandas DataFrame into a dictionary of arrays if not using Pandas
   if not use_pandas:
-    models = {k:(q.erg/q.AA/q.cm**2/q.s if k=='flux' else 1)*models[k].values for k in models.columns.values}
+    for k in models.columns.values:
+      models = {k:(q.erg/q.AA/q.cm**2/q.s if k=='flux' else 1)*(models[k].values if hasatter(models[k],"unit") else models[k])}
     models['wavelength'] = q.um*models['wavelength'][0]
 
   return models
