@@ -20,19 +20,23 @@ def pd_interp_models(params, coordinates, model_grid, smoothing=1):
 
   Notes
   -----
-  You might have to update scipy and some other things to run this. Updating takes about 1.5 hours! Do:
-  >>> ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
-  >>> brew install gcc
-  >>> pip install scipy --upgrade
+  You might have to update scipy and some other things to run this. Do:
+  >>> conda install scipy
 
   """
   from scipy.interpolate import LinearNDInterpolator
+  
+  # Make sure the model grid is a DataFrame
+  if not isinstance(model_grid, pd.DataFrame):
+    model_grid  ['flux'] = model_grid['flux'].value
+    model_grid['wavelength'] = [model_grid['wavelength'].value]*len(model_grid['flux'])
+    model_grid = pd.DataFrame(model_grid)
   
   # Transpose the Series of flux arrays into a Series of element-wise arrays of the flux at each wavelength point
   flux_columns = pd.Series(np.asarray(model_grid['flux'].tolist()).T.tolist())
   
   # Take out nusiance parameters and build parameter space from arrays
-  grid = np.asarray(model_grid.loc[:,params]).T
+  grid = np.asarray(model_grid.loc[:,params])
   
   # Define the wavelength array and an empty flux array
   W, F = model_grid['wavelength'][0], np.zeros(len(model_grid['wavelength'][0]))
@@ -84,9 +88,13 @@ def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,
   W = rebin_models if isinstance(rebin_models,(list,np.ndarray)) else models['wavelength'][0]
   
   # Rebin model spectra
-  def rebin(row): return [i.value for i in u.rebin_spec([row['wavelength']*q.um, row['flux']*q.erg/q.s/q.cm**2/q.AA], W*q.um)][:2]
-  models['wavelength'], models['flux'] = [[i[n] for i in models.apply(rebin, axis=1)] for n in [0,1]]
-  models['flux'] = [u.smooth(f,1) for f in models['flux']]
+  models['flux'] = pd.Series([u.rebin_spec([w*q.um, f*q.erg/q.s/q.cm**2/q.AA], W*q.um)[1].value for w,f in zip(list(models['wavelength']),list(models['flux']))])
+  models['wavelength'] = pd.Series([W]*len(models['flux']))
+  
+  # There was a problem with the code below applying the rebin function to the Pandas flux column so do it brute force above
+  # def rebin(row): return [i.value for i in u.rebin_spec([row['wavelength']*q.um, row['flux']*q.erg/q.s/q.cm**2/q.AA], W*q.um)][:2] 
+  # models['wavelength'], models['flux'] = [[i[n] for i in models.apply(rebin, axis=1)] for n in [0,1]]
+  # models['flux'] = [u.smooth(f,1) for f in models['flux']]
   
   # Get the coordinates in parameter space of each grid point
   coords = models.loc[:,params].values.tolist()
@@ -181,7 +189,7 @@ def fit_spectrum(raw_spectrum, model_grid, walkers, steps, object_name='Test', l
 	# Plotting
 	if plot:
 	  bdsamp.plot_triangle()
-# 	  bdsamp.plot_chains()
+    # bdsamp.plot_chains()
 	
   # Printing
 	if log: logging.info("ran MCMC"); logging.info("all done!")
@@ -191,7 +199,8 @@ def fit_spectrum(raw_spectrum, model_grid, walkers, steps, object_name='Test', l
 		print bdsamp.all_quantiles.T[1]
 	
   # Generate best fit spectrum the 50th quantile value
-	bdsamp.best_fit_spectrum = interp_models(bdsamp.all_params, bdsamp.all_quantiles.T[1], model_grid)
+	PD = {k:v for k,v in zip(bdsamp.all_params,bdsamp.all_quantiles.T[1])}
+	bdsamp.best_fit_spectrum = pd_interp_models(params, [PD[p] for p in params], model_grid)
 	
 	return bdsamp
 
