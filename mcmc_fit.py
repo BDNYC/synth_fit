@@ -1,4 +1,5 @@
-import logging, BDdb, cPickle, synth_fit, synth_fit.bdfit, astropy.units as q, utilities as u, numpy as np, matplotlib.pyplot as plt, pandas as pd
+from BDNYCdb import BDdb, utilities as u
+import logging, cPickle, SEDfit.synth_fit, SEDfit.synth_fit.bdfit, itertools, astropy.units as q, numpy as np, matplotlib.pyplot as plt, pandas as pd
 	
 def pd_interp_models(params, coordinates, model_grid, smoothing=1):
   """
@@ -28,7 +29,7 @@ def pd_interp_models(params, coordinates, model_grid, smoothing=1):
   
   # Make sure the model grid is a DataFrame
   if not isinstance(model_grid, pd.DataFrame):
-    model_grid  ['flux'] = model_grid['flux'].value
+    model_grid['flux'] = model_grid['flux'].value
     model_grid['wavelength'] = [model_grid['wavelength'].value]*len(model_grid['flux'])
     model_grid = pd.DataFrame(model_grid)
   
@@ -40,12 +41,12 @@ def pd_interp_models(params, coordinates, model_grid, smoothing=1):
   
   # Define the wavelength array and an empty flux array
   W, F = model_grid['wavelength'][0], np.zeros(len(model_grid['wavelength'][0]))
-    
+  
   # Interpolate to specified coordinates for each wavelength point in parameter space
   for n in range(len(F)):
     
     # Create grid interpolation function to pass coordinates to
-    interpND = LinearNDInterpolator(grid.T, flux_columns[n], rescale=True)
+    interpND = LinearNDInterpolator(grid, flux_columns[n], rescale=True)
   
     # Find flux value at desired coordinates in parameter space and insert into interpolated flux array
     F[n] = interpND(coordinates)
@@ -76,13 +77,19 @@ def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,
   # Load the model_atmospheres database and pull all the data from the specified table
   db = BDdb.get_db(model_atmosphere_db)
   if param_lims:
-    limit_text = ' AND '.join(["({0} BETWEEN {1} AND {2})".format(l[0],l[1],l[2]) for l in param_lims])
-    model_grid = db.dict("SELECT * FROM {} WHERE (teff LIKE '%00' OR teff LIKE '%50') AND {}".format(model_grid_name,limit_text)).fetchall()  
-  else: model_grid = db.dict("SELECT * FROM {} WHERE (teff LIKE '%00' OR teff LIKE '%50')".format(model_grid_name)).fetchall()
+    limit_text = ' AND ' .join([l[0]+' IN ('+','.join(map(str,np.arange(l[1],l[2]+l[3],l[3])))+')' for l in param_lims])
+    model_grid = db.dict("SELECT * FROM {} WHERE {} AND logg>=3 AND teff<2500".format(model_grid_name,limit_text)).fetchall()  
+  else: model_grid = db.dict("SELECT * FROM {} WHERE logg>=3 AND teff<2500".format(model_grid_name)).fetchall()
     
   # Load the model atmospheres into a data frame and define the parameters
   models = pd.DataFrame(model_grid)
   params = [p for p in models.columns.values.tolist() if p in ['teff','logg','f_sed','k_zz']]
+  
+  # Get the uppler bound, lower bound, and increment of the parameters
+  plims = {p[0]:p[1:] for p in param_lims} if param_lims else {}
+  for p in params:
+    if p not in plims: 
+      plims[p] = (min(models.loc[:,p]),max(models.loc[:,p]),max(np.diff(np.unique(np.asarray(models.loc[:,p]))), key=list(np.diff(np.unique(np.asarray(models.loc[:,p])))).count))
   
   # Choose template wavelength array to rebin all other spectra
   W = rebin_models if isinstance(rebin_models,(list,np.ndarray)) else models['wavelength'][0]
@@ -91,21 +98,26 @@ def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,
   models['flux'] = pd.Series([u.rebin_spec([w*q.um, f*q.erg/q.s/q.cm**2/q.AA], W*q.um)[1].value for w,f in zip(list(models['wavelength']),list(models['flux']))])
   models['wavelength'] = pd.Series([W]*len(models['flux']))
   
-  # There was a problem with the code below applying the rebin function to the Pandas flux column so do it brute force above
-  # def rebin(row): return [i.value for i in u.rebin_spec([row['wavelength']*q.um, row['flux']*q.erg/q.s/q.cm**2/q.AA], W*q.um)][:2] 
-  # models['wavelength'], models['flux'] = [[i[n] for i in models.apply(rebin, axis=1)] for n in [0,1]]
-  # models['flux'] = [u.smooth(f,1) for f in models['flux']]
+  # Get the coordinates in parameter space of each existing grid point
+  coords = models.loc[:,params].values
   
-  # Get the coordinates in parameter space of each grid point
-  coords = models.loc[:,params].values.tolist()
-  
+  # Get the coordinates in parameter space of each desired grid point
+  template = np.asarray(list(itertools.product(*[np.arange(l[0],l[1]+l[2],l[2]) for p,l in plims.items()])))
+
   # Find the holes in the grid based on the defined grid resolution without expanding the grid borders
-  def find_holes(coords):
+  def find_holes(coords, template=''):
+    # Make a grid of all the parameters
     coords = np.asanyarray(coords)
     uniq, labels = zip(*[np.unique(c, return_inverse=True) for c in coords.T])
     grid = np.zeros(map(len, uniq), bool)
+    # if template!='':
+    #   temp = np.asanyarray(template)
+    #   uniqT, labelsT = zip(*[np.unique(c, return_inverse=True) for c in temp.T])
+    #   gridT = np.zeros(map(len, uniqT), bool)
     grid[labels] = True
     candidates = np.zeros_like(grid)
+    
+    # Test if there are neighboring models for interpolation
     for dim in range(grid.ndim):
       grid0 = np.rollaxis(grid, dim)
       inside = np.logical_or.accumulate(grid0, axis=0) & np.logical_or.accumulate(grid0[::-1], axis=0)[::-1]
@@ -114,7 +126,7 @@ def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,
     hole_labels = np.where(holes)
     return np.column_stack([u[h] for u, h in zip(uniq, hole_labels)])
   
-  grid_holes = find_holes(coords)
+  grid_holes = find_holes(coords, template=template)
   
   # Interpolate the grid to fill in the holes
   for h in grid_holes:
@@ -128,10 +140,11 @@ def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,
   
   # Turn Pandas DataFrame into a dictionary of arrays if not using Pandas
   if not use_pandas:
-    models = {k:(q.erg/q.AA/q.cm**2/q.s if k=='flux' else 1)*models[k].values for k in models.columns.values}
-    models['wavelength'] = q.um*models['wavelength'][0]
+    M = {k:(q.erg/q.AA/q.cm**2/q.s if k=='flux' else 1)*models[k].values for k in models.columns.values}
+    M['wavelength'] = q.um*M['wavelength'][0]
+    return M
 
-  return models
+  else: return models
 
 # ===========================================================================================================================================
 # ===================================== Non-Pandas ==========================================================================================
