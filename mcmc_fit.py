@@ -1,4 +1,5 @@
-from BDNYCdb import BDdb, utilities as u
+import BDdb
+import utilities as u
 import logging, cPickle, SEDfit.synth_fit, SEDfit.synth_fit.bdfit, itertools, astropy.units as q, numpy as np, matplotlib.pyplot as plt, pandas as pd
 	
 def pd_interp_models(params, coordinates, model_grid, smoothing=1):
