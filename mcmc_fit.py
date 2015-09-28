@@ -133,7 +133,7 @@ def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,
     print 'Filling grid hole at {}'.format(h)
     new_spectrum = pd_interp_models(params, h, models, smoothing=False)
     new_row = {k:v for k,v in zip(params,h)}
-    new_row.update({'wavelength':new_spectrum[0], 'flux':new_spectrum[1]})
+    new_row.update({'wavelength':new_spectrum[0], 'flux':new_spectrum[1], 'comments':'interpolated'})
     models.append(new_row, ignore_index=True)
     
   # Sort the DataFrame by teff and logg?
