@@ -1,5 +1,5 @@
-import BDdb
-import utilities as u
+from BDNYCdb import BDdb
+from BDNYCdb import utilities as u
 import logging, cPickle, SEDfit.synth_fit, SEDfit.synth_fit.bdfit, itertools, astropy.units as q, numpy as np, matplotlib.pyplot as plt, pandas as pd
 	
 def pd_interp_models(params, coordinates, model_grid, smoothing=1):
@@ -141,7 +141,8 @@ def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,
   
   # Turn Pandas DataFrame into a dictionary of arrays if not using Pandas
   if not use_pandas:
-    M = {k:(q.erg/q.AA/q.cm**2/q.s if k=='flux' else 1)*models[k].values for k in models.columns.values}
+    M = {k:models[k].values for k in models.columns.values}
+    M['flux'] = q.erg/q.AA/q.cm**2/q.s*M['flux'][0]
     M['wavelength'] = q.um*M['wavelength'][0]
     return M
 
