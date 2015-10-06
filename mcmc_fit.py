@@ -140,7 +140,8 @@ def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,
   
   # Turn Pandas DataFrame into a dictionary of arrays if not using Pandas
   if not use_pandas:
-    M = {k:(q.erg/q.AA/q.cm**2/q.s if k=='flux' else 1)*models[k].values for k in models.columns.values}
+    M = {k:models[k].values for k in models.columns.values}
+    M['flux'] = q.erg/q.AA/q.cm**2/q.s*M['flux'][0]
     M['wavelength'] = q.um*M['wavelength'][0]
     return M
 
