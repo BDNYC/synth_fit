@@ -134,10 +134,12 @@ def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,
     new_spectrum = pd_interp_models(params, h, models, smoothing=False)
     new_row = {k:v for k,v in zip(params,h)}
     new_row.update({'wavelength':new_spectrum[0], 'flux':new_spectrum[1], 'comments':'interpolated'})
-    models.append(new_row, ignore_index=True)
+    new_row.update({'wavelength':new_spectrum[0], 'flux':new_spectrum[1], 'comments':'interpolated', 'metallicity':0, 'id':None})
+    models = models.append(new_row, ignore_index=True)
     
   # Sort the DataFrame by teff and logg?
-  
+  models.sort(list(reversed(params)), inplace=True)
+
   # Turn Pandas DataFrame into a dictionary of arrays if not using Pandas
   if not use_pandas:
     M = {k:models[k].values for k in models.columns.values}
