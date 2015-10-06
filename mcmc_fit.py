@@ -1,5 +1,5 @@
 from BDNYCdb import BDdb, utilities as u
-import logging, cPickle, SEDfit.synth_fit, SEDfit.synth_fit.bdfit, itertools, astropy.units as q, numpy as np, matplotlib.pyplot as plt, pandas as pd
+import logging, cPickle, SEDfit.synth_fit, itertools, astropy.units as q, numpy as np, matplotlib.pyplot as plt, pandas as pd
 	
 def pd_interp_models(params, coordinates, model_grid, smoothing=1):
   """
@@ -194,7 +194,7 @@ def fit_spectrum(raw_spectrum, model_grid, walkers, steps, object_name='Test', l
 	params = [i for i in model_grid.keys() if i in ['logg', 'teff', 'f_sed', 'k_zz']]
 	
 	# Set up the sampler object (it's a wrapper around emcee)
-	bdsamp = synth_fit.bdfit.BDSampler(object_name, spectrum, model_grid,	params, smooth=False,	plot_title="{}, {}".format(object_name,"BT-Settl 2013"), snap=False) # smooth=False if model already matches data, snap=True if no interpolation is needed on grid
+	bdsamp = SEDfit.synth_fit.bdfit.BDSampler(object_name, spectrum, model_grid,	params, smooth=False,	plot_title="{}, {}".format(object_name,"BT-Settl 2013"), snap=False) # smooth=False if model already matches data, snap=True if no interpolation is needed on grid
 																				        
 	# Run the mcmc method
 	bdsamp.mcmc_go(nwalk_mult=walkers, nstep_mult=steps, outfile=outfile)
