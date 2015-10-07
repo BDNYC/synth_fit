@@ -143,7 +143,8 @@ def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,
   # Turn Pandas DataFrame into a dictionary of arrays if not using Pandas
   if not use_pandas:
     M = {k:models[k].values for k in models.columns.values}
-    M['flux'] = q.erg/q.AA/q.cm**2/q.s*M['flux'][0]
+    
+    M['flux'] = q.erg/q.AA/q.cm**2/q.s*np.asarray(M['flux'])
     M['wavelength'] = q.um*M['wavelength'][0]
     return M
 
@@ -195,7 +196,7 @@ def fit_spectrum(raw_spectrum, model_grid, walkers, steps, object_name='Test', l
 	
 	# Specify the parameter space to be walked
 	params = [i for i in model_grid.keys() if i in ['logg', 'teff', 'f_sed', 'k_zz']]
-	
+
 	# Set up the sampler object (it's a wrapper around emcee)
 	bdsamp = SEDfit.synth_fit.bdfit.BDSampler(object_name, spectrum, model_grid,	params, smooth=False,	plot_title="{}, {}".format(object_name,"BT-Settl 2013"), snap=False) # smooth=False if model already matches data, snap=True if no interpolation is needed on grid
 																				        
