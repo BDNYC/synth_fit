@@ -53,7 +53,7 @@ def pd_interp_models(params, coordinates, model_grid, smoothing=1):
   
   return [W,u.smooth(F,smoothing) if smoothing else F]  
   
-def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,700,50),('logg',3.5,5.5,0.5)], rebin_models=True, use_pandas=False):
+def make_model_db(model_grid_name, model_atmosphere_db, grid_data='spec', param_lims=[('teff',400,700,50),('logg',3.5,5.5,0.5)], bands=[], rebin_models=True, use_pandas=False):
   '''
   Given a **model_grid_name**, returns the grid from the model_atmospheres.db as a Pandas DataFrame
   
@@ -63,6 +63,8 @@ def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,
     The name of the model grid table in the model_atmospheres.db SQL file, e.g. 'bt_settl_2013'
   model_atmosphere_db: str
     The path to model_atmospheres.db
+  grid_data: 'spec' or 'phot'
+    Returns a grid of spectra or synthetic photometry
   param_lims: list of tuples (optional)
     A list of tuples with the parameter name, lower limit, upper limit, and increment for each parameter to be constrained, e.g. [('teff',400,800,100),('logg',4,5,0.5)]
   rebin_models: array or bool
@@ -94,9 +96,19 @@ def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,
   # Choose template wavelength array to rebin all other spectra
   W = rebin_models if isinstance(rebin_models,(list,np.ndarray)) else models['wavelength'][0]
   
-  # Rebin model spectra
-  models['flux'] = pd.Series([u.rebin_spec([w*q.um, f*q.erg/q.s/q.cm**2/q.AA], W*q.um)[1].value for w,f in zip(list(models['wavelength']),list(models['flux']))])
-  models['wavelength'] = pd.Series([W]*len(models['flux']))
+  # Rebin model spectra or calculate synthetic magnitudes
+  if grid_data=='phot':
+    from syn_phot import syn_phot as s
+    model_phot = []
+    for w,f in zip(list(models['wavelength']),list(models['flux'])):
+      model_phot.append(s.all_mags([w*q.um, f*q.erg/q.s/q.cm**2/q.AA], bands=bands, Flam=False, to_flux=True, photon=False, to_list=True))
+
+    pF, pW = map(list,zip(*[map(list,zip(*[[i.value if hasattr(i,'unit') else i for i in j][::2] for j in k])) for k in model_phot]))
+    models['wavelength'], models['flux'] = pd.Series([np.array(i) for i in pW]), pd.Series([np.array(i) for i in pF])
+
+  else:
+    models['flux'] = pd.Series([u.rebin_spec([w*q.um, f*q.erg/q.s/q.cm**2/q.AA], W*q.um)[1].value for w,f in zip(list(models['wavelength']),list(models['flux']))])
+    models['wavelength'] = pd.Series([W]*len(models['flux']))
   
   # Get the coordinates in parameter space of each existing grid point
   coords = models.loc[:,params].values
@@ -142,8 +154,7 @@ def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,
 
   # Turn Pandas DataFrame into a dictionary of arrays if not using Pandas
   if not use_pandas:
-    M = {k:models[k].values for k in models.columns.values}
-    
+    M = {k:models[k].values for k in models.columns.values}    
     M['flux'] = q.erg/q.AA/q.cm**2/q.s*np.asarray(M['flux'])
     M['wavelength'] = q.um*M['wavelength'][0]
     return M
@@ -154,23 +165,27 @@ def make_model_db(model_grid_name, model_atmosphere_db, param_lims=[('teff',400,
 # ===================================== Non-Pandas ==========================================================================================
 # ===========================================================================================================================================
 
-def fit_spectrum(raw_spectrum, model_grid, walkers, steps, object_name='Test', log=False, plot=True, prnt=True, outfile=None):
+def fit_spectrum(raw_spectrum, model_grid, walkers, steps, mask=[], db='', object_name='Test', log=False, plot=True, prnt=True, outfile=None):
 	'''
 	Given **raw_spectrum** as an integer id from the SPECTRUM table or a [W,F,E] list with astropy units, 
 	returns a marginalized distribution plot of best fit parameters from the specified **model_grid** name.
 	
 	Parameters
 	----------
-	raw_spectrum: int, dict
-	  An integer id for the desired spectrum from the SPECTRA table or a dictionary with the wavelength and flux arrays to be fit
+	raw_spectrum: int, sequence
+	  An integer id for the desired spectrum from the SPECTRA table or [w,f,e] sequence of astropy quantity arrays to be fit
 	model_grid: str
 	  The name of the model grid to be used in the fit, e.g. 'bt_settl_2013'
 	walkers: int
 	  The number of walkers to deploy
 	steps: int
 	  The number of steps for each walker to take
+  mask: sequence (optional)
+    Tuples of wavelength ranges to exclude in the model fits, e.g. mask=[(1.12,1.16),(1.35,1.42)] for J-H-K water absorption bands
+  db: instance
+    The pre-loaded BDNYCdb.BDdb.get_db() database instance to pull the spectrum from
 	
-	Retiurns
+	Returns
 	--------
 	bdsamp: object
 	  The MCMC result instance
@@ -180,7 +195,6 @@ def fit_spectrum(raw_spectrum, model_grid, walkers, steps, object_name='Test', l
 		
 	# Input can be [W,F,E] or an id from the SPECTRUM table of the BDNYC Data Archive
 	if isinstance(raw_spectrum,int):
-		db = BDdb.get_db('/Users/paigegiorla/Desktop/PG_DB_2_16_15.db')
 		query_spectrum = db.dict("SELECT * from spectra where id={}".format(raw_spectrum)).fetchone()
 	
 		# Turn into a dictionary with astropy units quantities
@@ -191,6 +205,9 @@ def fit_spectrum(raw_spectrum, model_grid, walkers, steps, object_name='Test', l
 	
 	else: 
 		spectrum = {'wavelength':raw_spectrum[0], 'flux':raw_spectrum[1], 'unc':raw_spectrum[2]}
+		
+	# Apply mask to flux and unc arrays to exclude those regions from the MCMC fit
+	for m in mask: spectrum['flux'], spectrum['unc'] = [np.ma.masked_where(np.logical_and(spectrum['wavelength']>m[0]*q.um,spectrum['wavelength']<m[-1]*q.um), spectrum[arr])*spectrum[arr].unit for arr in ['flux','unc']]
 	
 	if log: logging.debug(model_grid['wavelength'].shape); logging.debug(model_grid['wavelength'])
 	
