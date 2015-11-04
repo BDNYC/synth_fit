@@ -265,11 +265,11 @@ class BDSampler(object):
 		self.cropchain = sampler.chain.reshape((-1,self.ndim))
 		self.get_quantiles()
 
-	def plot_triangle(self):
+	def plot_triangle(self,extents=None):
 		"""
 		Calls triangle module to create a corner-plot of the results
 		"""
-		self.corner_fig = triangle.corner(self.cropchain, labels=self.all_params,quantiles=[.16,.5,.84], verbose=False)#, truths=np.ones(3))
+		self.corner_fig = triangle.corner(self.cropchain, labels=self.all_params,quantiles=[.16,.5,.84], verbose=False,extents=extents)#, truths=np.ones(3))
 		plt.suptitle(self.plot_title)
 
 

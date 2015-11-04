@@ -125,11 +125,17 @@ def corner(xs, labels=None, extents=None, truths=None, truth_color="#4682b4",
         # Check for parameters that never change.
         m = np.array([e[0] == e[1] for e in extents], dtype=bool)
         if np.any(m):
-            raise ValueError(("It looks like the parameter(s) in column(s) "
-                              "{0} have no dynamic range. Please provide an "
-                              "`extent` argument.")
-                             .format(", ".join(map("{0}".format,
-                                                   np.arange(len(m))[m]))))
+        	idxs = np.where(m==True)[0]
+        	for i in idxs:
+        		if min(xs[i])==0:      			
+        			extents[i] = [min(xs[i])-1,max(xs[i])+1]
+        		else:
+        			extents[i] = [min(xs[i])*0.99,max(xs[i])*1.01]
+#             raise ValueError(("It looks like the parameter(s) in column(s) "
+#                               "{0} have no dynamic range. Please provide an "
+#                               "`extent` argument.")
+#                              .format(", ".join(map("{0}".format,
+#                                                    np.arange(len(m))[m]))))
 
     for i, x in enumerate(xs):
         ax = axes[i, i]
@@ -253,7 +259,6 @@ def hist2d(x, y, *args, **kwargs):
     cmap._init()
     cmap._lut[:-3, :-1] = 0.
     cmap._lut[:-3, -1] = np.linspace(1, 0, cmap.N)
-
     X = np.linspace(extent[0][0], extent[0][1], bins + 1)
     Y = np.linspace(extent[1][0], extent[1][1], bins + 1)
     try:
