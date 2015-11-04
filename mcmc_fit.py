@@ -54,7 +54,7 @@ def pd_interp_models(params, coordinates, model_grid, smoothing=1):
   return [W,u.smooth(F,smoothing) if smoothing else F]  
   
 
-def make_model_db(model_grid_name, model_atmosphere_db, grid_data='spec', param_lims=[('teff',400,700,50),('logg',3.5,5.5,0.5)], fill_holes=True,bands=[], rebin_models=True, use_pandas=False):
+def make_model_db(model_grid_name, model_atmosphere_db, grid_data='spec', param_lims=[('teff',400,700,50),('logg',3.5,5.5,0.5)], fill_holes=True, bands=[], rebin_models=True, use_pandas=False):
   '''
   Given a **model_grid_name**, returns the grid from the model_atmospheres.db as a Pandas DataFrame
   
@@ -112,7 +112,7 @@ def make_model_db(model_grid_name, model_atmosphere_db, grid_data='spec', param_
     models['flux'] = pd.Series([u.rebin_spec([w*q.um, f*q.erg/q.s/q.cm**2/q.AA], W*q.um)[1].value for w,f in zip(list(models['wavelength']),list(models['flux']))])
     models['wavelength'] = pd.Series([W]*len(models['flux']))
   
-  if fill_holes == True:
+  if fill_holes:
     # Get the coordinates in parameter space of each existing grid point
     coords = models.loc[:,params].values
   
@@ -121,25 +121,25 @@ def make_model_db(model_grid_name, model_atmosphere_db, grid_data='spec', param_
 
     # Find the holes in the grid based on the defined grid resolution without expanding the grid borders
     def find_holes(coords, template=''):
-        # Make a grid of all the parameters
-        coords = np.asanyarray(coords)
-        uniq, labels = zip(*[np.unique(c, return_inverse=True) for c in coords.T])
-        grid = np.zeros(map(len, uniq), bool)
-        # if template!='':
-        #   temp = np.asanyarray(template)
-        #   uniqT, labelsT = zip(*[np.unique(c, return_inverse=True) for c in temp.T])
-        #   gridT = np.zeros(map(len, uniqT), bool)
-        grid[labels] = True
-        candidates = np.zeros_like(grid)
-	
-        # Test if there are neighboring models for interpolation
-        for dim in range(grid.ndim):
-          grid0 = np.rollaxis(grid, dim)
-          inside = np.logical_or.accumulate(grid0, axis=0) & np.logical_or.accumulate(grid0[::-1], axis=0)[::-1]
-          candidates |= np.rollaxis(inside, 0, dim+1)
-        holes = candidates & ~grid
-        hole_labels = np.where(holes)
-        return np.column_stack([u[h] for u, h in zip(uniq, hole_labels)])
+      # Make a grid of all the parameters
+      coords = np.asanyarray(coords)
+      uniq, labels = zip(*[np.unique(c, return_inverse=True) for c in coords.T])
+      grid = np.zeros(map(len, uniq), bool)
+      # if template!='':
+      #   temp = np.asanyarray(template)
+      #   uniqT, labelsT = zip(*[np.unique(c, return_inverse=True) for c in temp.T])
+      #   gridT = np.zeros(map(len, uniqT), bool)
+      grid[labels] = True
+      candidates = np.zeros_like(grid)
+
+      # Test if there are neighboring models for interpolation
+      for dim in range(grid.ndim):
+        grid0 = np.rollaxis(grid, dim)
+        inside = np.logical_or.accumulate(grid0, axis=0) & np.logical_or.accumulate(grid0[::-1], axis=0)[::-1]
+        candidates |= np.rollaxis(inside, 0, dim+1)
+      holes = candidates & ~grid
+      hole_labels = np.where(holes)
+      return np.column_stack([u[h] for u, h in zip(uniq, hole_labels)])
   
     grid_holes = find_holes(coords, template=template)
   
@@ -176,8 +176,8 @@ def fit_spectrum(raw_spectrum, model_grid, walkers, steps, mask=[], db='', objec
 	
 	Parameters
 	----------
-	raw_spectrum: int, sequence
-	  An integer id for the desired spectrum from the SPECTRA table or [w,f,e] sequence of astropy quantity arrays to be fit
+	raw_spectrum: sequence, dict
+	  A dictionary or [w,f,e] sequence of astropy quantity arrays to be fit
 	model_grid: str
 	  The name of the model grid to be used in the fit, e.g. 'bt_settl_2013'
 	walkers: int
@@ -197,51 +197,40 @@ def fit_spectrum(raw_spectrum, model_grid, walkers, steps, mask=[], db='', objec
 	
 	if log: logging.basicConfig(level=logging.DEBUG)
 		
-	# Input can be [W,F,E] or an id from the SPECTRUM table of the BDNYC Data Archive
-	if isinstance(raw_spectrum,int):
-		query_spectrum = db.dict("SELECT * from spectra where id={}".format(raw_spectrum)).fetchone()
-	
-        # Turn into a dictionary with astropy units quantities
-        wave_unit = u.Unit(query_spectrum['wavelength_units'])
-        flux_unit = u.Unit(query_spectrum['flux_units'].replace("ergss","erg s").replace('ergs','erg s').replace('Wm','W m').replace("A","AA"))
-		
-        spectrum = {'wavelength':query_spectrum['wavelength']*wave_unit, 'flux':query_spectrum['flux']*flux_unit,	'unc':query_spectrum['unc']*flux_unit}
-	
-
-	else: 
-		spectrum = {'wavelength':raw_spectrum[0], 'flux':raw_spectrum[1], 'unc':raw_spectrum[2]}
+	# Input [W,F,E] or spectrum dictionary
+	spectrum = raw_spectrum if isinstance(raw_spectrum,dict) else {'wavelength':raw_spectrum[0], 'flux':raw_spectrum[1], 'unc':raw_spectrum[2]}
 		
 	# Apply mask to flux and unc arrays to exclude those regions from the MCMC fit
 	for m in mask: spectrum['flux'], spectrum['unc'] = [np.ma.masked_where(np.logical_and(spectrum['wavelength']>m[0]*q.um,spectrum['wavelength']<m[-1]*q.um), spectrum[arr])*spectrum[arr].unit for arr in ['flux','unc']]
 	
-    if log: logging.debug(model_grid['wavelength'].shape); logging.debug(model_grid['wavelength'])
-	
-    # Specify the parameter space to be walked
-    params = [i for i in model_grid.keys() if i in ['logg', 'teff', 'f_sed', 'k_zz']]
+  if log: logging.debug(model_grid['wavelength'].shape); logging.debug(model_grid['wavelength'])
 
-    # Set up the sampler object (it's a wrapper around emcee)
-    bdsamp = SEDfit.synth_fit.bdfit.BDSampler(object_name, spectrum, model_grid,	params, smooth=False,	plot_title="{}, {}".format(object_name,"BT-Settl 2013"), snap=False) # smooth=False if model already matches data, snap=True if no interpolation is needed on grid
-																				        
-    # Run the mcmc method
-    bdsamp.mcmc_go(nwalk_mult=walkers, nstep_mult=steps, outfile=outfile)
-	
-    # Plotting
-    if plot:
-      bdsamp.plot_triangle(extents=extents)
-      bdsamp.plot_chains()
-	
-    # Printing
-    if log: logging.info("ran MCMC"); logging.info("all done!")
-	
-    if prnt:
-        print bdsamp.all_params
-        print bdsamp.all_quantiles.T[1]
+  # Specify the parameter space to be walked
+  params = [i for i in model_grid.keys() if i in ['logg', 'teff', 'f_sed', 'k_zz']]
+
+  # Set up the sampler object (it's a wrapper around emcee)
+  bdsamp = SEDfit.synth_fit.bdfit.BDSampler(object_name, spectrum, model_grid,	params, smooth=False,	plot_title="{}, {}".format(object_name,"BT-Settl 2013"), snap=False) # smooth=False if model already matches data, snap=True if no interpolation is needed on grid
+																			        
+  # Run the mcmc method
+  bdsamp.mcmc_go(nwalk_mult=walkers, nstep_mult=steps, outfile=outfile)
+
+  # Plotting
+  if plot:
+    bdsamp.plot_triangle(extents=extents)
+    bdsamp.plot_chains()
+
+  # Printing
+  if log: logging.info("ran MCMC"); logging.info("all done!")
+
+  if prnt:
+    print bdsamp.all_params
+    print bdsamp.all_quantiles.T[1]
 	
   # Generate best fit spectrum the 50th quantile value
-    PD = {k:v for k,v in zip(bdsamp.all_params,bdsamp.all_quantiles.T[1])}
-    bdsamp.best_fit_spectrum = pd_interp_models(params, [PD[p] for p in params], model_grid)
-	
-    return bdsamp
+  PD = {k:v for k,v in zip(bdsamp.all_params,bdsamp.all_quantiles.T[1])}
+  bdsamp.best_fit_spectrum = pd_interp_models(params, [PD[p] for p in params], model_grid)
+
+  return bdsamp
 
 def interp_models(params, coordinates, model_grid, smoothing=1):
   """
