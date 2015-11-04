@@ -1,6 +1,6 @@
 from BDNYCdb import BDdb, utilities as u
 import logging, cPickle, SEDfit.synth_fit, itertools, astropy.units as q, numpy as np, matplotlib.pyplot as plt, pandas as pd
-	
+
 def pd_interp_models(params, coordinates, model_grid, smoothing=1):
   """
   Interpolation code that accepts a model grid and a list of parameters/values to return an interpolated spectrum.
@@ -169,67 +169,60 @@ def make_model_db(model_grid_name, model_atmosphere_db, grid_data='spec', param_
 # ===========================================================================================================================================
 
 
-def fit_spectrum(raw_spectrum, model_grid, walkers, steps, mask=[], db='', object_name='Test', log=False, plot=True, prnt=True, outfile=None):
-	'''
-	Given **raw_spectrum** as an integer id from the SPECTRUM table or a [W,F,E] list with astropy units, 
-	returns a marginalized distribution plot of best fit parameters from the specified **model_grid** name.
-	
-	Parameters
-	----------
-	raw_spectrum: sequence, dict
-	  A dictionary or [w,f,e] sequence of astropy quantity arrays to be fit
-	model_grid: str
-	  The name of the model grid to be used in the fit, e.g. 'bt_settl_2013'
-	walkers: int
-	  The number of walkers to deploy
-	steps: int
-	  The number of steps for each walker to take
+def fit_spectrum(raw_spectrum, model_grid, walkers, steps, mask=[], db='', object_name='Test', log=False, plot=True, outfile=None):
+  '''
+  Given **raw_spectrum** as an integer id from the SPECTRUM table or a [W,F,E] list with astropy units, 
+  returns a marginalized distribution plot of best fit parameters from the specified **model_grid** name.
+  
+  Parameters
+  ----------
+  raw_spectrum: sequence, dict
+    A dictionary or [w,f,e] sequence of astropy quantity arrays to be fit
+  model_grid: str
+    The name of the model grid to be used in the fit, e.g. 'bt_settl_2013'
+  walkers: int
+    The number of walkers to deploy
+  steps: int
+    The number of steps for each walker to take
   mask: sequence (optional)
     Tuples of wavelength ranges to exclude in the model fits, e.g. mask=[(1.12,1.16),(1.35,1.42)] for J-H-K water absorption bands
   db: instance
     The pre-loaded BDNYCdb.BDdb.get_db() database instance to pull the spectrum from
-	
-	Returns
-	--------
-	bdsamp: object
-	  The MCMC result instance
-	'''
-	
-	if log: logging.basicConfig(level=logging.DEBUG)
-		
-	# Input [W,F,E] or spectrum dictionary
-	spectrum = raw_spectrum if isinstance(raw_spectrum,dict) else {'wavelength':raw_spectrum[0], 'flux':raw_spectrum[1], 'unc':raw_spectrum[2]}
-		
-	# Apply mask to flux and unc arrays to exclude those regions from the MCMC fit
-	for m in mask: spectrum['flux'], spectrum['unc'] = [np.ma.masked_where(np.logical_and(spectrum['wavelength']>m[0]*q.um,spectrum['wavelength']<m[-1]*q.um), spectrum[arr])*spectrum[arr].unit for arr in ['flux','unc']]
-	
-  if log: logging.debug(model_grid['wavelength'].shape); logging.debug(model_grid['wavelength'])
-
+  
+  Returns
+  --------
+  bdsamp: object
+    The MCMC result instance
+  '''
+  if log: logging.basicConfig(level=logging.DEBUG)
+  
+  # Input [W,F,E] or spectrum dictionary
+  spectrum = raw_spectrum if isinstance(raw_spectrum,dict) else {'wavelength':raw_spectrum[0], 'flux':raw_spectrum[1], 'unc':raw_spectrum[2]}
+  
+  # Apply mask to flux and unc arrays to exclude those regions from the MCMC fit
+  for m in mask: spectrum['flux'], spectrum['unc'] = [np.ma.masked_where(np.logical_and(spectrum['wavelength']>m[0]*q.um,spectrum['wavelength']<m[-1]*q.um), spectrum[arr])*spectrum[arr].unit for arr in ['flux','unc']]
+  
   # Specify the parameter space to be walked
   params = [i for i in model_grid.keys() if i in ['logg', 'teff', 'f_sed', 'k_zz']]
-
+  
   # Set up the sampler object (it's a wrapper around emcee)
-  bdsamp = SEDfit.synth_fit.bdfit.BDSampler(object_name, spectrum, model_grid,	params, smooth=False,	plot_title="{}, {}".format(object_name,"BT-Settl 2013"), snap=False) # smooth=False if model already matches data, snap=True if no interpolation is needed on grid
-																			        
+  bdsamp = SEDfit.synth_fit.bdfit.BDSampler(object_name, spectrum, model_grid,~params, smooth=False, plot_title="{}, {}".format(object_name,"BT-Settl 2013"), snap=False) # smooth=False if model already matches data, snap=True if no interpolation is needed on grid
+  
   # Run the mcmc method
   bdsamp.mcmc_go(nwalk_mult=walkers, nstep_mult=steps, outfile=outfile)
-
+  
   # Plotting
-  if plot:
-    bdsamp.plot_triangle(extents=extents)
-    bdsamp.plot_chains()
-
+  if plot: bdsamp.plot_triangle(extents=extents), bdsamp.plot_chains()
+  
   # Printing
-  if log: logging.info("ran MCMC"); logging.info("all done!")
-
-  if prnt:
-    print bdsamp.all_params
-    print bdsamp.all_quantiles.T[1]
-	
+  if log: 
+    logging.info("ran MCMC")
+    logging.info("all done!")
+    
   # Generate best fit spectrum the 50th quantile value
   PD = {k:v for k,v in zip(bdsamp.all_params,bdsamp.all_quantiles.T[1])}
   bdsamp.best_fit_spectrum = pd_interp_models(params, [PD[p] for p in params], model_grid)
-
+  
   return bdsamp
 
 def interp_models(params, coordinates, model_grid, smoothing=1):
