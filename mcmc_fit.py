@@ -1,7 +1,9 @@
 from astrodbkit import astrodb 
-from BDNYCdb import utilities as u
+import myutilities as u
+import pickle
+import BDdb
 import logging, cPickle, SEDfit.synth_fit, itertools, astropy.units as q, numpy as np, matplotlib.pyplot as plt, pandas as pd
-
+import synth_fit.bdfit
 def pd_interp_models(params, coordinates, model_grid, smoothing=1):
   """
   Interpolation code that accepts a model grid and a list of parameters/values to return an interpolated spectrum.
@@ -55,7 +57,7 @@ def pd_interp_models(params, coordinates, model_grid, smoothing=1):
   return [W,u.smooth(F,smoothing) if smoothing else F]  
   
 
-def make_model_db(model_grid_name, model_atmosphere_db, grid_data='spec', param_lims=[('teff',400,700,50),('logg',3.5,5.5,0.5)], fill_holes=True, bands=[], rebin_models=True, use_pandas=False):
+def make_model_db(model_grid_name, model_atmosphere_db, model_grid=None, grid_data='spec', param_lims=[('teff',400,1600,50),('logg',3.5,5.5,0.5)], fill_holes=True, bands=[], rebin_models=True, use_pandas=False):
   '''
   Given a **model_grid_name**, returns the grid from the model_atmospheres.db as a Pandas DataFrame
   
@@ -79,12 +81,14 @@ def make_model_db(model_grid_name, model_atmosphere_db, grid_data='spec', param_
   
   '''
   # Load the model_atmospheres database and pull all the data from the specified table
-  db = astrodb.get_db(model_atmosphere_db)
-  if param_lims:
-    limit_text = ' AND ' .join([l[0]+' IN ('+','.join(map(str,np.arange(l[1],l[2]+l[3],l[3])))+')' for l in param_lims])
-    model_grid = db.dict("SELECT * FROM {} WHERE {}".format(model_grid_name,limit_text)).fetchall()  
-  else: model_grid = db.dict("SELECT * FROM {}".format(model_grid_name)).fetchall()
-    
+  if model_grid==None: 
+		db = BDdb.get_db(model_atmosphere_db)
+		if param_lims:
+			limit_text = ' AND ' .join([l[0]+' IN ('+','.join(map(str,np.arange(l[1],l[2]+l[3],l[3])))+')' for l in param_lims])
+			model_grid = db.dict("SELECT * FROM {} WHERE {}".format(model_grid_name,limit_text)).fetchall()  
+		else: model_grid = db.dict("SELECT * FROM {}".format(model_grid_name)).fetchall()
+
+	
   # Load the model atmospheres into a data frame and define the parameters
   models = pd.DataFrame(model_grid)
   params = [p for p in models.columns.values.tolist() if p in ['teff','logg','f_sed','k_zz']]
@@ -170,7 +174,7 @@ def make_model_db(model_grid_name, model_atmosphere_db, grid_data='spec', param_
 # ===========================================================================================================================================
 
 
-def fit_spectrum(raw_spectrum, model_grid, walkers, steps, mask=[], db='', extents=None,object_name='Test', log=False, plot=True, prnt=True, outfile=None):
+def fit_spectrum(raw_spectrum, model_grid, model_grid_name, shortname,walkers, steps, mask=[], db='', extents=None,object_name='Test', log=False, plot=True, prnt=True, generate=True,outfile=None):
   '''
   Given **raw_spectrum** as an integer id from the SPECTRUM table or a [W,F,E] list with astropy units, 
   returns a marginalized distribution plot of best fit parameters from the specified **model_grid** name.
@@ -197,7 +201,7 @@ def fit_spectrum(raw_spectrum, model_grid, walkers, steps, mask=[], db='', exten
   '''
 	
   if log: logging.basicConfig(level=logging.DEBUG)
-  db = astrodb.get_db(db)
+#   db = BDdb.get_db(db)
 	
   # Input can be [W,F,E] or an id from the SPECTRUM table of the BDNYC Data Archive
   if isinstance(raw_spectrum,int):
@@ -212,9 +216,8 @@ def fit_spectrum(raw_spectrum, model_grid, walkers, steps, mask=[], db='', exten
 
   else: 
   	spectrum = {'wavelength':raw_spectrum[0], 'flux':raw_spectrum[1], 'unc':raw_spectrum[2]}
-		
   # Apply mask to flux and unc arrays to exclude those regions from the MCMC fit
-  for m in mask: spectrum['flux'], spectrum['unc'] = [np.ma.masked_where(np.logical_and(spectrum['wavelength']>m[0]*q.um,spectrum['wavelength']<m[-1]*q.um), spectrum[arr])*spectrum[arr].unit for arr in ['flux','unc']]
+#   for m in mask: spectrum['flux'], spectrum['unc'] = [np.ma.masked_where(np.logical_and(spectrum['wavelength']>m[0]*q.um,spectrum['wavelength']<m[-1]*q.um), spectrum[arr])*spectrum[arr].unit for arr in ['flux','unc']]
 	
   if log: logging.debug(model_grid['wavelength'].shape); logging.debug(model_grid['wavelength'])
 
@@ -222,7 +225,7 @@ def fit_spectrum(raw_spectrum, model_grid, walkers, steps, mask=[], db='', exten
   params = [i for i in model_grid.keys() if i in ['logg', 'teff', 'f_sed', 'k_zz']]
 
   # Set up the sampler object (it's a wrapper around emcee)
-  bdsamp = SEDfit.synth_fit.bdfit.BDSampler(object_name, spectrum, model_grid,	params, smooth=False,	plot_title="{}, {}".format(object_name,"BT-Settl 2013"), snap=False) # smooth=False if model already matches data, snap=True if no interpolation is needed on grid
+  bdsamp = synth_fit.bdfit.BDSampler(object_name, spectrum, model_grid,	params, smooth=False,	plot_title="{}, {}".format(object_name,model_grid_name), snap=False) # smooth=False if model already matches data, snap=True if no interpolation is needed on grid
 																			        
   # Run the mcmc method
   bdsamp.mcmc_go(nwalk_mult=walkers, nstep_mult=steps, outfile=outfile)
@@ -230,7 +233,18 @@ def fit_spectrum(raw_spectrum, model_grid, walkers, steps, mask=[], db='', exten
   # Plotting
   if plot:
     bdsamp.plot_triangle(extents=extents)
-    bdsamp.plot_chains()
+    fig = plt.gcf()
+    fig = plt.savefig('/Users/paigegiorla/Desktop/{}_{}'.format(model_grid_name,shortname)+'_triangle.eps')
+    fig = plt.clf()
+  
+    bdsamp.plot_chains()                                                           
+    fig = plt.gcf()                                                       
+    fig = plt.savefig('/Users/paigegiorla/Desktop/{}_{}'.format(model_grid_name,shortname)+'_chains.eps')                                                    
+    fig = plt.clf()
+    
+
+  # Printing
+  if log: logging.info("ran MCMC"); logging.info("all done!")
 
   # Printing
   if log: logging.info("ran MCMC"); logging.info("all done!")
@@ -239,9 +253,48 @@ def fit_spectrum(raw_spectrum, model_grid, walkers, steps, mask=[], db='', exten
       print bdsamp.all_params
       print bdsamp.all_quantiles.T[1]
 	
-  # Generate best fit spectrum the 50th quantile value
+	# Generate best fit spectrum the 50th quantile value
   PD = {k:v for k,v in zip(bdsamp.all_params,bdsamp.all_quantiles.T[1])}
   bdsamp.best_fit_spectrum = pd_interp_models(params, [PD[p] for p in params], model_grid)
+  params_with_unc = bdsamp.get_error_and_unc()
+  
+  # Save chain and text file
+  fb = open('/Users/paigegiorla/Desktop/{}_{}'.format(model_grid_name,shortname)+'_bdsamp.txt','wb')
+  pickle.dump([bdsamp.start_p,bdsamp.all_params,bdsamp.all_quantiles.T[1],bdsamp.best_fit_spectrum,params_with_unc],fb)
+  fb.close()
+  fb = open('/Users/paigegiorla/Desktop/{}_{}'.format(model_grid_name,shortname)+'_chain.pkl','wb')
+  pickle.dump(bdsamp.chain,fb)
+  fb.close()  
+  
+  # Make bestfit plot
+  w,f,e = raw_spectrum[0].value,raw_spectrum[1].value, raw_spectrum[2].value
+#   best_fit_spectrum = bdsamp.best_fit_spectrum  
+#   mult1 = float(sum(f*best_fit_spectrum[1]/(e**2)))
+#   mult = float(sum(best_fit_spectrum[1]*best_fit_spectrum[1]/(e**2)))
+#   ck = mult1/mult
+#   mod_flux=best_fit_spectrum[1]*ck
+#   plt.scatter(best_fit_spectrum[0],mod_flux,c='r',label='50th quantile fit')
+#   plt.errorbar(w,f,yerr=e,label=shortname)
+#   plt.xlim(1.49,2.17)
+#   plt.ylim(min(f)*1.1,max(f)*1.1)
+#   plt.legend()
+#   plt.savefig('/Users/paigegiorla/Desktop/{}_{}'.format(model_grid_name,shortname)+'_bestfit.eps')
+#   plt.clf()
+
+
+  which_model_legend = []
+  for i in bdsamp.all_quantiles.T[1][:-4]:
+    num = float("{0:.2f}".format(i))
+    which_model_legend.append(num)
+  plt.plot(w,bdsamp.model.retrieve_model(bdsamp.all_quantiles.T[1][:-4]),color='r',label=which_model_legend)
+  plt.errorbar(w,f,yerr=e,color='k',label=shortname)
+  plt.legend()
+  plt.xlim(min(w)-min(w)*0.01,max(w)+max(w)*0.01)
+  plt.xlabel('Wavelength ($\mu$m)')
+  plt.ylabel('Normalized Flux')
+  plt.savefig('/Users/paigegiorla/Desktop/{}_{}'.format(model_grid_name,shortname)+'_bestfit.eps')
+  plt.clf()
+
   
   return bdsamp
 

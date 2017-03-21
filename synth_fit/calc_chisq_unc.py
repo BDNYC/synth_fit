@@ -135,12 +135,16 @@ def test_all(data_wave, data_flux, data_unc, model_dict, params,
 #         mod_flux = mod_flux*ck
         mult1 = data_flux*mod_flux/(data_unc**2)
         bad = np.isnan(mult1)
-        mult = np.sum(mult1[~bad])
+        mult = mult1[~bad]
+        bad2 = np.isinf(mult)
+        mult = np.sum(mult[~bad2])
         sq1 = mod_flux*mod_flux/(data_unc**2)
-        mult2 = float(sum(sq1[~bad]))
+        mult2 = sq1[~bad]
+        
+        mult2 = float(sum(mult2[~bad2]))
         ck = mult/mult2
         mod_flux=mod_flux*ck
-
+        
         chisq[i] = calc_chisq(data_flux, data_unc, mod_flux)
         foo = plt.scatter(model_dict['teff'][i],chisq[i],c=model_dict['logg'][i],cmap=new_cmap,edgecolor='None',vmin=2.75,vmax=5.75)
         params_list = []
@@ -167,7 +171,7 @@ def test_all(data_wave, data_flux, data_unc, model_dict, params,
     plt.clf()
    
         
-    fb = open('/Users/paigegiorla/Desktop/chisquares_{}'.format(shortname)+'.pkl','wb')
+    fb = open('/Users/paigegiorla/Desktop/chisquares.pkl','wb')
     pickle.dump(save_chisq,fb)
     fb.close()
     return best_params,min(chisq)

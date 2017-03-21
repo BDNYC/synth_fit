@@ -20,7 +20,7 @@ class ModelGrid(object):
     duplicate spectra and the interpolation will fail/be incorrect!
 
     So, for now, params needs to include ALL of the keys in model_dict
-    (aside from "wsyn" and "fsyn")
+    (aside from "wavelength" and "flux")
 
     Parameters
     ----------
@@ -28,7 +28,7 @@ class ModelGrid(object):
         keys of 'wavelength', 'flux', and 'unc' give the relevant arrays
 
     model_dict: dictionary
-        keys 'wsyn' and 'fsyn' should correspond to model wavelength and 
+        keys 'wavelength' and 'flux' should correspond to model wavelength and 
         flux arrays, and those should be astropy.units Quantities
         other keys should correspond to params
 
@@ -75,7 +75,7 @@ class ModelGrid(object):
         duplicate spectra and the interpolation will fail/be incorrect!
 
         So, for now, params needs to include ALL of the keys in model_dict
-        (aside from "wsyn" and "fsyn")
+        (aside from "wavelength" and "flux")
 
         Parameters
         ----------
@@ -83,7 +83,7 @@ class ModelGrid(object):
             keys of 'wavelength', 'flux', and 'unc' give the relevant arrays
 
         model_dict: dictionary
-            keys 'wsyn' and 'fsyn' should correspond to model wavelength and 
+            keys 'wavelength' and 'flux' should correspond to model wavelength and 
             flux arrays, and those should be astropy.units Quantities
             other keys should correspond to params
 
@@ -114,12 +114,12 @@ class ModelGrid(object):
         self.wavelength_bins = wavelength_bins
 
         ## check that the input model dictionary is formatted correctly
-        if ('wsyn' in self.mod_keys)==False:
-            logging.info("ERROR! model wavelength array must be keyed with 'wsyn'!")
-        if ('fsyn' in self.mod_keys)==False:
-            logging.info("ERROR! model flux must be keyed with 'fsyn'!")
-        if ((type(self.model['wsyn'])!=u.quantity.Quantity) |
-            (type(self.model['fsyn'])!=u.quantity.Quantity) |
+        if ('wavelength' in self.mod_keys)==False:
+            logging.info("ERROR! model wavelength array must be keyed with 'wavelength'!")
+        if ('flux' in self.mod_keys)==False:
+            logging.info("ERROR! model flux must be keyed with 'flux'!")
+        if ((type(self.model['wavelength'])!=u.quantity.Quantity) |
+            (type(self.model['flux'])!=u.quantity.Quantity) |
             (type(spectrum['wavelength'])!=u.quantity.Quantity) |
             (type(spectrum['flux'])!=u.quantity.Quantity) |
             (type(spectrum['unc'])!=u.quantity.Quantity)):
@@ -150,21 +150,21 @@ class ModelGrid(object):
         logging.debug("data units w {} f {} u {}".format(
             spectrum['wavelength'].unit, spectrum['flux'].unit,
             spectrum['unc'].unit))
-        logging.debug("model units w {} f {}".format(self.model['wsyn'].unit,
-            self.model['fsyn'].unit))
-        self.wave = spectrum['wavelength'].to(self.model['wsyn'].unit)
-        self.flux = np.float64(spectrum['flux'].to(self.model['fsyn'].unit,
+        logging.debug("model units w {} f {}".format(self.model['wavelength'].unit,
+            self.model['flux'].unit))
+        self.wave = spectrum['wavelength'].to(self.model['wavelength'].unit)
+        self.flux = np.float64(spectrum['flux'].to(self.model['flux'].unit,
              equivalencies=u.spectral_density(self.wave)))
-        self.unc = np.float64(spectrum['unc'].to(self.model['fsyn'].unit,
+        self.unc = np.float64(spectrum['unc'].to(self.model['flux'].unit,
              equivalencies=u.spectral_density(self.wave)))
 
         ## Is the first element of the wavelength arrays the same?
-        check_diff = self.model['wsyn'][0]-self.wave[0]
+        check_diff = self.model['wavelength'][0]-self.wave[0]
 
         ## If the model and wavelength arrays are the same length
         ## and have the same first element, then don't need to interpolate 
         ## the model onto the data wavelength array
-        if ((len(self.model['wsyn'])==len(self.wave)) and 
+        if ((len(self.model['wavelength'])==len(self.wave)) and 
             (abs(check_diff.value)<1e-10)):
             self.interp = False
             logging.info('NO INTERPOLATION')
@@ -181,7 +181,7 @@ class ModelGrid(object):
             self.snap = snap
         self.snap = snap
 
-        self.model_flux_units = self.model['fsyn'][0].unit
+        self.model_flux_units = self.model['flux'][0].unit
 
 
     def __call__(self,*args):
@@ -370,7 +370,7 @@ class ModelGrid(object):
                 logging.info('ERROR: Multi/No model {} {}'.format(cpar,find_i))
                 return np.ones(len(self.wave))*-99.0*self.flux.unit
 #            print find_i
-            corner_spectra[tuple(cpar)] = self.model['fsyn'][find_i]
+            corner_spectra[tuple(cpar)] = self.model['flux'][find_i]
 
 #        logging.debug('finished getting corner spectra')
 
@@ -437,13 +437,13 @@ class ModelGrid(object):
         # THIS IS WHERE THE CODE TAKES A LONG TIME
         if self.smooth:
 #            logging.debug('starting smoothing')
-            mod_flux = falt2(self.model['wsyn'],mod_flux,resolution) 
+            mod_flux = falt2(self.model['wavelength'],mod_flux,resolution) 
 #            logging.debug('finished smoothing {}'.format(type(mod_flux)))
 #        else:
 #            logging.debug('no smoothing')
         if self.interp:
 #            logging.debug('starting interp')
-            mod_flux = np.interp(self.wave,self.model['wsyn'],mod_flux)
+            mod_flux = np.interp(self.wave,self.model['wavelength'],mod_flux)
 #            logging.debug('finished interp')
 
         mod_flux = self.normalize_model(mod_flux)
@@ -462,19 +462,24 @@ class ModelGrid(object):
         #The model spectra are at some arbitrary luminosity;
         #the scaling factor places this model spectrum at the same
         #apparent luminosity as the observed spectrum.     
-        mult1 = self.flux*model_flux
-	bad = np.isnan(mult1)
-	mult = np.sum(mult1[~bad])
-        #print 'mult',mult                                 
-        sq1 = model_flux**2
-        square = np.sum(sq1[~bad])
-        #print 'sq',square                                 
-        ck = mult/square
-        #print 'ck',ck                                     
-        #Applying scaling factor to rescale model flux array
-        model_flux = model_flux*ck
+#         mult1 = self.flux*model_flux
+#         bad = np.isnan(mult1)
+#         mult = np.sum(mult1[~bad])
+#         #print 'mult',mult                                 
+#         sq1 = model_flux**2
+#         square = np.sum(sq1[~bad])
+#         #print 'sq',square                                 
+#         ck = mult/square
+#         #print 'ck',ck                                     
+#         #Applying scaling factor to rescale model flux array
+#         model_flux = model_flux*ck
 #        logging.debug('finished renormalization') 
 
+        mult1 = sum(self.flux*model_flux/(self.unc**2))
+        mult = sum(model_flux*model_flux/(self.unc**2))
+        ck = mult1/mult
+        model_flux = model_flux*ck
+        
         if return_ck:
             return model_flux, ck
         else:
@@ -584,7 +589,7 @@ class ModelGrid(object):
         # p_loc is the location in the model grid that fits all the 
         # constraints up to that point. There aren't constraints yet,
         # so it matches the full array.
-        p_loc = range(len(self.model['fsyn']))
+        p_loc = range(len(self.model['flux']))
 
         if self.is_grid_complete:
             for i in range(self.ndim):
@@ -603,7 +608,7 @@ class ModelGrid(object):
         logging.debug(str(p_loc))
         mod_flux = np.ones(len(self.wave))*-99.0*self.flux.unit
         if len(p_loc)==1:
-            mod_flux = self.model['fsyn'][p_loc]
+            mod_flux = self.model['flux'][p_loc]
             while len(mod_flux)==1:
                 mod_flux = mod_flux[0]
         else:
@@ -613,14 +618,14 @@ class ModelGrid(object):
 
         if self.smooth:
 #            logging.debug('starting smoothing')
-            mod_flux = falt2(self.model['wsyn'],mod_flux,resolution) 
+            mod_flux = falt2(self.model['wavelength'],mod_flux,resolution) 
 #            logging.debug('finished smoothing')
 #        else:
 #            logging.debug('no smoothing')
         if self.interp:
             logging.debug('starting interp {} {} {}'.format(len(self.wave),
-                len(self.model['wsyn']),len(mod_flux)))
-            mod_flux = np.interp(self.wave,self.model['wsyn'],mod_flux)
+                len(self.model['wavelength']),len(mod_flux)))
+            mod_flux = np.interp(self.wave,self.model['wavelength'],mod_flux)
             logging.debug('finished interp')
 
         mod_flux = self.normalize_model(mod_flux)

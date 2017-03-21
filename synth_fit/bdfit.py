@@ -148,14 +148,14 @@ class BDSampler(object):
 
         ## Calculate starting parameters for the emcee walkers 
         ## by minimizing chi-squared just using the grid of synthetic spectra
-        self.start_p = test_all(spectrum['wavelength'],spectrum['flux'],
-            spectrum['unc'], model, params,smooth=smooth)
+        self.start_p, self.min_chi = test_all(spectrum['wavelength'],spectrum['flux'],
+            spectrum['unc'], model, params,smooth=smooth,shortname=obj_name)
         for i in range(self.model_ndim):
             if (self.start_p[i]>=self.model.plims[params[i]]['max']):
                 self.start_p[i] = self.start_p[i]*0.95
             elif (self.start_p[i]<=self.model.plims[params[i]]['min']):
                 self.start_p[i] = self.start_p[i]*1.05
-
+        print 'chisq:', self.start_p
         ## Add additional parameters beyond the atmospheric model parameters
         self.all_params = list(np.copy(params))
 
@@ -249,7 +249,7 @@ class BDSampler(object):
 
         ## cut out the burn-in samples (first 10%, for now)
         burn_in = np.floor(nsteps*0.1)
-        self.cropchain = sampler.chain[:,burn_in:,:].reshape(
+        self.cropchain = sampler.chain[:,int(burn_in):,:].reshape(
             (-1,self.ndim))
 
         if self.snap:
@@ -271,16 +271,15 @@ class BDSampler(object):
         ## Reshape the chains (don't need to crop out burn-in b/c that's done)
         ## This makes one array with all the samples for each parameter
         self.cropchain = sampler.chain.reshape((-1,self.ndim))
-
-    def plot_triangle(self):
+        self.get_quantiles()
+    
+    def plot_triangle(self,extents=None):
         """
         Calls triangle module to create a corner-plot of the results
         """
-        self.corner_fig = triangle.corner(self.cropchain,
-            labels=self.all_params,quantiles=[.16,.5,.84])#,
-#            truths=np.ones(3))
+        self.corner_fig = triangle.corner(self.cropchain, labels=self.all_params,quantiles=[.16,.5,.84], verbose=False,extents=extents)#, truths=np.ones(3))
         plt.suptitle(self.plot_title)
-
+        
 
     def plot_chains(self):
         """

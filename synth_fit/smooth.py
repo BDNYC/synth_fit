@@ -218,8 +218,8 @@ def smooth_grid(model_dict, data_wave, variable=True, delta_pixels=2,
 
     model_dict: dictionary
         dictionary containing calculated model spectra
-        wavelength array should be keyed by 'wsyn' and
-        flux arrays by 'fsyn'
+        wavelength array should be keyed by 'wavelength' and
+        flux arrays by 'flux'
 
     data_wave: astropy.units Quantity
          The data wavelength array
@@ -255,36 +255,36 @@ def smooth_grid(model_dict, data_wave, variable=True, delta_pixels=2,
 
     # make a copy of the model
     model_new = model_dict.copy()
-    mlen = len(model_dict['fsyn'])
+    mlen = len(model_dict['flux'])
     logging.debug(str(model_dict.keys()))
     logging.debug(str(model_new.keys()))
 
     # for each grid point, call variable_smooth to get the smoothed model
     for i in range(mlen):
         if indiv_wave_arrays:
-            model_wave_array = model_dict['wsyn'][i]
+            model_wave_array = model_dict['wavelength'][i]
         else:
-            model_wave_array = model_dict['wsyn']
+            model_wave_array = model_dict['wavelength']
 
         if variable:
             new_flux = variable_smooth(model_wave_array,
-                model_dict['fsyn'][i],data_wave,delta_pixels=delta_pixels,
+                model_dict['flux'][i],data_wave,delta_pixels=delta_pixels,
                 res_scale=res_scale)
         else:
             new_flux = smooth_model(model_wave_array,
-                model_dict['fsyn'][i],data_wave,res)
+                model_dict['flux'][i],data_wave,res)
         logging.debug('{} {}'.format(len(new_flux),len(data_wave)))
         logging.debug('{} {}'.format(i,str(model_new.keys())))
-        logging.debug("{} {}".format(type(model_dict['fsyn'][i]),type(new_flux)))
-        model_new['fsyn'][i] = new_flux*model_dict['fsyn'][i].unit
-        logging.debug("{}".format(model_new['fsyn'][i].unit))
+        logging.debug("{} {}".format(type(model_dict['flux'][i]),type(new_flux)))
+        model_new['flux'][i] = new_flux*model_dict['flux'][i].unit
+        logging.debug("{}".format(model_new['flux'][i].unit))
         if (np.mod(i,10))==0 and (incremental_outfile!='none'):
             open_outfile = open(incremental_outfile,'wb')
             cPickle.dump(model_new,open_outfile)
             open_outfile.close()
-#    logging.debug("model complete; funit {} wunit {}".format(model_new['fsyn'].unit,model_new['wsyn'].unit))
-    model_new['fsyn'] = model_new['fsyn']*model_dict['fsyn'][i].unit
-    model_new['wsyn'] = data_wave
-    #logging.debug("model updated; funit {} wunit {}".format(model_new['fsyn'].unit,model_new['wsyn'].unit))
+#    logging.debug("model complete; funit {} wunit {}".format(model_new['flux'].unit,model_new['wavelength'].unit))
+    model_new['flux'] = model_new['flux']*model_dict['flux'][i].unit
+    model_new['wavelength'] = data_wave
+    #logging.debug("model updated; funit {} wunit {}".format(model_new['flux'].unit,model_new['wavelength'].unit))
     # return model_new
     return model_new
