@@ -1,10 +1,9 @@
 from astrodbkit import astrodb
-import myutilities as u
+import myutilities as u  # TODO: Is this one of your modules or same as Joe's utilities?
 import pickle
-import BDdb
 import logging
 import cPickle
-import SEDfit.synth_fit
+import SEDfit.synth_fit  # TODO: What should this be?
 import itertools
 import astropy.units as q
 import numpy as np
@@ -13,7 +12,7 @@ import pandas as pd
 import synth_fit.bdfit
 
 
-def pd_interp_models(params, coordinates, model_grid, smoothing=1):
+def pd_interp_models(params, coordinates, model_grid, smoothing=1):  # TODO: What is this smoothing?
     """
     Interpolation code that accepts a model grid and a list of parameters/values to return an interpolated spectrum.
 
@@ -33,8 +32,7 @@ def pd_interp_models(params, coordinates, model_grid, smoothing=1):
 
     Notes
     -----
-    You might have to update scipy and some other things to run this. Do:
-    >>> conda install scipy
+    You might have to update scipy and some other things to run this. Do in python: conda install scipy
 
     """
 
@@ -49,7 +47,7 @@ def pd_interp_models(params, coordinates, model_grid, smoothing=1):
     # Transpose the Series of flux arrays into a Series of element-wise arrays of the flux at each wavelength point
     flux_columns = pd.Series(np.asarray(model_grid['flux'].tolist()).T.tolist())
 
-    # Take out nusiance parameters and build parameter space from arrays
+    # Take out nuisance parameters and build parameter space from arrays
     grid = np.asarray(model_grid.loc[:, params])
 
     # Define the wavelength array and an empty flux array
@@ -93,21 +91,22 @@ def make_model_db(model_grid_name, model_atmosphere_db, model_grid=None, grid_da
 
     """
 
+# TODO: Ask Paige about param_lims- should be blank or just []? What is model_grid=None mean? bands=[]?
     # Load the model_atmospheres database and pull all the data from the specified table
     if model_grid == None:
-        db = BDdb.get_db(model_atmosphere_db)
+        ma_db = astrodb.Database(model_atmosphere_db)
         if param_lims:
             limit_text = ' AND '.join(
                 [l[0] + ' IN (' + ','.join(map(str, np.arange(l[1], l[2] + l[3], l[3]))) + ')' for l in param_lims])
-            model_grid = db.dict("SELECT * FROM {} WHERE {}".format(model_grid_name, limit_text)).fetchall()
+            model_grid = ma_db.dict("SELECT * FROM {} WHERE {}".format(model_grid_name, limit_text)).fetchall()
         else:
-            model_grid = db.dict("SELECT * FROM {}".format(model_grid_name)).fetchall()
+            model_grid = ma_db.dict("SELECT * FROM {}".format(model_grid_name)).fetchall()
 
     # Load the model atmospheres into a data frame and define the parameters
     models = pd.DataFrame(model_grid)
     params = [p for p in models.columns.values.tolist() if p in ['teff', 'logg', 'f_sed', 'k_zz']]
 
-    # Get the uppler bound, lower bound, and increment of the parameters
+    # Get the upper bound, lower bound, and increment of the parameters
     plims = {p[0]: p[1:] for p in param_lims} if param_lims else {}
     for p in params:
         if p not in plims:
@@ -120,7 +119,7 @@ def make_model_db(model_grid_name, model_atmosphere_db, model_grid=None, grid_da
 
     # Rebin model spectra or calculate synthetic magnitudes
     if grid_data == 'phot':
-        from syn_phot import syn_phot as s
+        from syn_phot import syn_phot as s  # TODO: What is this?
         model_phot = []
         for w, f in zip(list(models['wavelength']), list(models['flux'])):
             model_phot.append(
@@ -147,7 +146,7 @@ def make_model_db(model_grid_name, model_atmosphere_db, model_grid=None, grid_da
         template = np.asarray(list(itertools.product(*[np.arange(l[0], l[1] + l[2], l[2]) for p, l in plims.items()])))
 
         # Find the holes in the grid based on the defined grid resolution without expanding the grid borders
-        def find_holes(coords, template=''):
+        def find_holes(coords):  # , template=''): TODO: Need if keep other part of code???
             # Make a grid of all the parameters
             coords = np.asanyarray(coords)
             uniq, labels = zip(*[np.unique(c, return_inverse=True) for c in coords.T])
@@ -168,7 +167,7 @@ def make_model_db(model_grid_name, model_atmosphere_db, model_grid=None, grid_da
             hole_labels = np.where(holes)
             return np.column_stack([u[h] for u, h in zip(uniq, hole_labels)])
 
-        grid_holes = find_holes(coords, template=template)
+        grid_holes = find_holes(coords, template=template)  # TODO: Remove b/c commented out? Or Just comment out?
 
         # Interpolate the grid to fill in the holes
         for h in grid_holes:
@@ -202,6 +201,7 @@ def make_model_db(model_grid_name, model_atmosphere_db, model_grid=None, grid_da
 
 def fit_spectrum(raw_spectrum, model_grid, model_grid_name, shortname, walkers, steps, mask=[], db='', extents=None,
                  object_name='Test', log=False, plot=True, prnt=True, generate=True, outfile=None):
+    # TODO: Why model_grid and model_grid_name???????? What are all these underlined things?
     """
     Given **raw_spectrum** as an integer id from the SPECTRUM table or a [W,F,E] list with astropy units,
     returns a marginalized distribution plot of best fit parameters from the specified **model_grid** name.
@@ -231,12 +231,12 @@ def fit_spectrum(raw_spectrum, model_grid, model_grid_name, shortname, walkers, 
 
     if log:
         logging.basicConfig(level=logging.DEBUG)
-    # db = BDdb.get_db(db)
+    # db = BDdb.get_db(db)    # TODO: Switch?  db = astrodb.Database('path')
 
     # Input can be [W,F,E] or an id from the SPECTRUM table of the BDNYC Data Archive
     if isinstance(raw_spectrum, int):
         query_spectrum = db.dict("SELECT * from spectra where id={}".format(raw_spectrum)).fetchone()
-
+# TODO: Is this for the Data Database? If so should the line above not be commented out?
         # Turn into a dictionary with astropy units quantities
         wave_unit = q.Unit(query_spectrum['wavelength_units'])
         flux_unit = q.Unit(query_spectrum['flux_units'].replace("ergss", "erg s").replace('ergs', 'erg s').replace('Wm',
@@ -387,6 +387,7 @@ def interp_models(params, coordinates, model_grid, smoothing=1):
 # ====================================================== TESTS =========================================================
 # ======================================================================================================================
 
+# TODO: Why are all of these values predefined in def and for loop?
 def model_grid_smoothness_test(models, param_lims={'teff': (0, 800), 'logg': (4.0, 6.0)}, rebin_models=True):
     """
     Given a **model_grid_name**, returns the grid from the model_atmospheres.db in the proper format to work with fit_spectrum()
