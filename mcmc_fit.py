@@ -12,6 +12,7 @@ import pandas as pd
 import synth_fit.bdfit
 
 
+#TODO: Which code do you start with?
 def pd_interp_models(params, coordinates, model_grid, smoothing=1):  # TODO: What is this smoothing?
     """
     Interpolation code that accepts a model grid and a list of parameters/values to return an interpolated spectrum.
