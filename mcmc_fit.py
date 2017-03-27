@@ -1,9 +1,9 @@
 from astrodbkit import astrodb
-import myutilities as u  # TODO: Is this one of your modules or same as Joe's utilities?
+from SEDkit import utilities as u
 import pickle
 import logging
 import cPickle
-import SEDfit.synth_fit  # TODO: What should this be?
+#import synth_fit.synth_fit
 import itertools
 import astropy.units as q
 import numpy as np
@@ -12,8 +12,7 @@ import pandas as pd
 import synth_fit.bdfit
 
 
-#TODO: Which code do you start with?
-def pd_interp_models(params, coordinates, model_grid, smoothing=1):  # TODO: What is this smoothing?
+def pd_interp_models(params, coordinates, model_grid, smoothing=1):
     """
     Interpolation code that accepts a model grid and a list of parameters/values to return an interpolated spectrum.
 
@@ -25,6 +24,9 @@ def pd_interp_models(params, coordinates, model_grid, smoothing=1):  # TODO: Wha
         A list of the coordinates in parameter space to evaluate, e.g. [1643, 5.1, 2.3]
     model_grid: Pandas DataFrame
         A Pandas dataframe of the database
+    smoothing:
+        From Joe's utilities file uses a Kaiser-Bessel smoothing function, with 1 being very smooth and the larger the
+        value the less smooth.
 
     Returns
     -------
@@ -77,14 +79,21 @@ def make_model_db(model_grid_name, model_atmosphere_db, model_grid=None, grid_da
         The name of the model grid table in the model_atmospheres.db SQL file, e.g. 'bt_settl_2013'
     model_atmosphere_db: str
         The path to model_atmospheres.db
+    model_grid: instance
+        Default is None. This is the str or variable name given to a pickle file path of the model grid if available.
     grid_data: 'spec' or 'phot'
         Returns a grid of spectra or synthetic photometry
     param_lims: list of tuples (optional)
         A list of tuples with the parameter name, lower limit, upper limit, and increment for each parameter to be
         constrained, e.g. [('teff',400,800,100),('logg',4,5,0.5)]
+    fill_holes: bool
+        Default is True. Fills the holes in the model grid to give full coverage over your parameters
+    bands: no one knows!
     rebin_models: array or bool
         The wavelength array to which all model spectra should be rebinned OR True if random rebinning is desired
-
+        may need to update u.rebin_spec if not working.
+    use_pandas: bool
+        Default is False. Uses a pandas dataframe as output.
     Returns
     -------
     models: Pandas DataFrame
@@ -92,8 +101,8 @@ def make_model_db(model_grid_name, model_atmosphere_db, model_grid=None, grid_da
 
     """
 
-# TODO: Ask Paige about param_lims- should be blank or just []? What is model_grid=None mean? bands=[]?
-    # Load the model_atmospheres database and pull all the data from the specified table
+    # If not using model grid form a pickle file, load the model_atmospheres database and pull all the data from
+    # the specified table
     if model_grid == None:
         ma_db = astrodb.Database(model_atmosphere_db)
         if param_lims:
@@ -120,7 +129,7 @@ def make_model_db(model_grid_name, model_atmosphere_db, model_grid=None, grid_da
 
     # Rebin model spectra or calculate synthetic magnitudes
     if grid_data == 'phot':
-        from syn_phot import syn_phot as s  # TODO: What is this?
+        from SEDkit import syn_phot as s
         model_phot = []
         for w, f in zip(list(models['wavelength']), list(models['flux'])):
             model_phot.append(
@@ -147,7 +156,7 @@ def make_model_db(model_grid_name, model_atmosphere_db, model_grid=None, grid_da
         template = np.asarray(list(itertools.product(*[np.arange(l[0], l[1] + l[2], l[2]) for p, l in plims.items()])))
 
         # Find the holes in the grid based on the defined grid resolution without expanding the grid borders
-        def find_holes(coords):  # , template=''): TODO: Need if keep other part of code???
+        def find_holes(coords, template=''):
             # Make a grid of all the parameters
             coords = np.asanyarray(coords)
             uniq, labels = zip(*[np.unique(c, return_inverse=True) for c in coords.T])
@@ -168,7 +177,7 @@ def make_model_db(model_grid_name, model_atmosphere_db, model_grid=None, grid_da
             hole_labels = np.where(holes)
             return np.column_stack([u[h] for u, h in zip(uniq, hole_labels)])
 
-        grid_holes = find_holes(coords, template=template)  # TODO: Remove b/c commented out? Or Just comment out?
+        grid_holes = find_holes(coords, template=template)
 
         # Interpolate the grid to fill in the holes
         for h in grid_holes:
@@ -202,7 +211,6 @@ def make_model_db(model_grid_name, model_atmosphere_db, model_grid=None, grid_da
 
 def fit_spectrum(raw_spectrum, model_grid, model_grid_name, shortname, walkers, steps, mask=[], db='', extents=None,
                  object_name='Test', log=False, plot=True, prnt=True, generate=True, outfile=None):
-    # TODO: Why model_grid and model_grid_name???????? What are all these underlined things?
     """
     Given **raw_spectrum** as an integer id from the SPECTRUM table or a [W,F,E] list with astropy units,
     returns a marginalized distribution plot of best fit parameters from the specified **model_grid** name.
@@ -212,8 +220,12 @@ def fit_spectrum(raw_spectrum, model_grid, model_grid_name, shortname, walkers, 
     raw_spectrum: int, sequence
         An integer id for the desired spectrum from the SPECTRA table or [w,f,e] sequence of astropy quantity arrays to
         be fit
-    model_grid: str
+    model_grid: instance
+        pickle file of model grid to be used
+    model_grid_name: str
         The name of the model grid to be used in the fit, e.g. 'bt_settl_2013'
+    shortname: str
+        Name of object
     walkers: int
         The number of walkers to deploy
     steps: int
@@ -223,6 +235,20 @@ def fit_spectrum(raw_spectrum, model_grid, model_grid_name, shortname, walkers, 
         absorption bands
     db: instance
         The pre-loaded BDNYCdb.astrodb.get_db() database instance to pull the spectrum from
+    extents:
+        Default is None. Not sure what this does.
+    object_name: str
+        Name of object
+    log: bool
+        Default is False.Keeping track log.
+    plot:bool
+        Plots the results. Default is True
+    prnt: bool
+        Prints the results. Default is True
+    generate: bool
+        Deault is True
+    outfile:
+        path to an output file? Deault is None.
  
     Returns
     --------
@@ -387,8 +413,6 @@ def interp_models(params, coordinates, model_grid, smoothing=1):
 # ======================================================================================================================
 # ====================================================== TESTS =========================================================
 # ======================================================================================================================
-
-# TODO: Why are all of these values predefined in def and for loop?
 def model_grid_smoothness_test(models, param_lims={'teff': (0, 800), 'logg': (4.0, 6.0)}, rebin_models=True):
     """
     Given a **model_grid_name**, returns the grid from the model_atmospheres.db in the proper format to work with fit_spectrum()
