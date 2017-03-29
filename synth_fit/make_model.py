@@ -1,7 +1,7 @@
 # Function that interpolates a model
 # Includes the ModelGrid class, which 
 # 2 December 2013, Stephanie Douglas
-###############################################################################
+################################################################################
 
 import logging
 
@@ -20,7 +20,7 @@ class ModelGrid(object):
     duplicate spectra and the interpolation will fail/be incorrect!
 
     So, for now, params needs to include ALL of the keys in model_dict
-    (aside from "wsyn" and "fsyn")
+    (aside from "wavelength" and "flux")
 
     Parameters
     ----------
@@ -75,7 +75,7 @@ class ModelGrid(object):
         duplicate spectra and the interpolation will fail/be incorrect!
 
         So, for now, params needs to include ALL of the keys in model_dict
-        (aside from "wsyn" and "fsyn")
+        (aside from "wavelength" and "flux")
 
         Parameters
         ----------
@@ -83,8 +83,8 @@ class ModelGrid(object):
             keys of 'wavelength', 'flux', and 'unc' give the relevant arrays
 
         model_dict: dictionary
-            keys 'wavelength' and 'flux' should correspond to all model wavelength arrays and 
-            all model flux arrays, and those should be astropy.units Quantities
+            keys 'wavelength' and 'flux' should correspond to model wavelength and 
+            flux arrays, and those should be astropy.units Quantities
             other keys should correspond to params
 
         params: array of strings
@@ -123,8 +123,8 @@ class ModelGrid(object):
             (type(spectrum['wavelength'])!=u.quantity.Quantity) |
             (type(spectrum['flux'])!=u.quantity.Quantity) |
             (type(spectrum['unc'])!=u.quantity.Quantity)):
-            raise TypeError("model arrays and spectrum arrays must all"
-                            " be of type astropy.units.quantity.Quantity")
+            logging.info("ERROR! model arrays and spectrum arrays must all"
+                + " be of type astropy.units.quantity.Quantity")
 
         ## Note that the ndim here is just for the MODEL, not everything being fit
         self.params = params
@@ -136,9 +136,8 @@ class ModelGrid(object):
         ## along with making sure the parameter values are in numpy arrays
         self.plims = {}
         for p in self.params:
-            # print self.model[p]
             if (p in self.mod_keys)==False:
-                raise ValueError("ERROR! parameter {} not found!".format(p))
+                logging.info('ERROR! parameter %s not found!',p)
             else:
                 self.plims[p] = {'vals':np.asarray(self.model[p])}
                 self.plims[p]['min'] = min(self.plims[p]['vals'])
@@ -219,7 +218,8 @@ class ModelGrid(object):
         logging.debug('params {} normalization {} ln(s) {}'.format(
             model_p,norm_values,lns))
 
-        # if (normalization<0.) or (normalization>2.0): return -np.inf
+#        if (normalization<0.) or (normalization>2.0):
+#            return -np.inf
 
         normalization = self.calc_normalization(norm_values,#[])
             self.wavelength_bins)
@@ -244,8 +244,13 @@ class ModelGrid(object):
             mod_flux = self.interp_models(model_p)
 
         # if the model isn't found, interp_models returns an array of -99s
+#        logging.debug(str(type(mod_flux)))
+#        logging.debug(str(mod_flux.dtype))
+#        logging.debug(mod_flux)
         if sum(mod_flux.value)<0: 
             return -np.inf
+
+#        mod_flux = mod_flux*normalization
 
         # On the advice of Dan Foreman-Mackey, I'm changing the calculation
         # of lnprob.  The additional uncertainty/tolerance needs to be 
@@ -256,12 +261,16 @@ class ModelGrid(object):
         logging.debug("type unc {} s {} n {}".format(self.unc.value.dtype,
             type(s.value),type(normalization)))
         unc_sq = (self.unc**2 + s**2)  * normalization**2 
-
+#        unc_sq = (self.unc**2) * normalization**2
+#        logging.debug("unc_sq {}".format(unc_sq))
         logging.debug("units f {} mf {}".format(self.flux.unit,
             mod_flux.unit))
         flux_pts = (self.flux-mod_flux*normalization)**2/unc_sq
         width_term = np.log(2*np.pi*unc_sq.value)
-
+#        logging.debug("flux+pts {}".format(flux_pts))
+#        logging.debug("width_term {} flux pts {} units fp {}".format(
+#            np.sum(width_term),np.sum(flux_pts),flux_pts.unit))
+        #logging.debug("units wt {}".format(width_term.unit))
         lnprob = -0.5*(np.sum(flux_pts + width_term))
         logging.debug('p {} lnprob {}'.format(str(args),str(lnprob)))
         return lnprob
@@ -294,8 +303,8 @@ class ModelGrid(object):
         # Get the "edge values" - the grid values above and below
         # the desired values
         for i in range(self.ndim):
-            # print self.params[i]
-            # print self.plims[self.params[i]]['vals']
+#            print self.params[i]
+#            print self.plims[self.params[i]]['vals']
             if (p[i] in self.plims[self.params[i]]['vals']):
                 grid_edges[self.params[i]] = np.array([p[i]])
                 edge_inds[self.params[i]] = np.where(
@@ -306,12 +315,12 @@ class ModelGrid(object):
                      self.plims[self.params[i]]['vals']<p[i]])
                 up_val = min(self.plims[self.params[i]]['vals'][
                      self.plims[self.params[i]]['vals']>p[i]])
-                logging.debug('up {} down {}'.format(up_val,dn_val))
+#                logging.debug('up {} down {}'.format(up_val,dn_val))
                 grid_edges[self.params[i]] = np.array([dn_val,up_val])
                 edge_inds[self.params[i]] = np.array([np.where(
                     self.plims[self.params[i]]['vals']==dn_val)[0],np.where(
                     self.plims[self.params[i]]['vals']==up_val)[0]])
-        logging.debug('skipping: {}'.format(single_flags))
+#        logging.debug('skipping: {}'.format(single_flags))
 
         # If all the paramters need to be interpolated (the usual case)
         # then we need 2**ndim spectra (that's how many 'corners' there are)
@@ -320,7 +329,7 @@ class ModelGrid(object):
         # need to interpolate because models at that Teff exist in our grid)
         num_spectra = 2**(self.ndim-len(single_flags))
         to_interp = np.delete(range(self.ndim),single_flags)
-        logging.debug('%d spectra', num_spectra)
+#        logging.debug('%d spectra', num_spectra)
 
         # Get the "corners" of the model grid - the model values that
         # will be interpolated between.  This creates a bunch of tuples 
@@ -341,10 +350,10 @@ class ModelGrid(object):
             loc = ((np.arange(num_spectra)/div_by) % 2)
             loc1 = np.where(loc==0)[0]
             loc2 = np.where(loc)[0]
-            logging.debug('div_by {} loc1 {} loc2 {}'.format(div_by,loc1,loc2))
+#            logging.debug('div_by {} loc1 {} loc2 {}'.format(div_by,loc1,loc2))
             grid_corners[loc1,i] = grid_edges[self.params[i]][0]
             grid_corners[loc2,i] = grid_edges[self.params[i]][1]
-        logging.debug('all corners: %s',str(grid_corners))
+#        logging.debug('all corners: %s',str(grid_corners))
 
         # Get the actual corner spectra to be interpolated
         corner_spectra = {}
@@ -356,42 +365,42 @@ class ModelGrid(object):
                 find_i = (find_i & 
                      (cpar[i]==self.plims[self.params[i]]['vals']))
             find_i = np.where(find_i)[0]
-            logging.debug(str(cpar))
+#            logging.debug(str(cpar))
             if len(find_i)!=1:
                 logging.info('ERROR: Multi/No model {} {}'.format(cpar,find_i))
                 return np.ones(len(self.wave))*-99.0*self.flux.unit
-            # print find_i
+#            print find_i
             corner_spectra[tuple(cpar)] = self.model['flux'][find_i]
 
-        logging.debug('finished getting corner spectra')
+#        logging.debug('finished getting corner spectra')
 
         # Interpolate at all paramters requiring interpolation, skip the rest
         old_corners = np.copy(grid_corners)
         old_spectra = dict(corner_spectra)
 
         for i in range(self.ndim):
-            logging.debug('now dealing with %d %s',i,self.params[i])
+#            logging.debug('now dealing with %d %s',i,self.params[i])
             if i in to_interp:
                 # get the values to be interpolated between for this loop
                 interp1 = old_corners[0,0]
                 interp2 = old_corners[len(old_corners)/2,0]
-                logging.debug('lower {}  upper {}'.format(interp1,interp2))
+#                logging.debug('lower {}  upper {}'.format(interp1,interp2))
 
                 # coeff expresses how close the new value is to the lower value 
                 # relative to the distance between the upper and lower values
                 if self.params[i]=='teff':
-                    logging.debug('NEW TEFF COEFF')
+#                    logging.debug('NEW TEFF COEFF')
                     coeff = (p[i]**4 - interp1**4)*1.0/(interp2**4 - interp1**4)
                 else:
                     coeff = (p[i] - interp1)*1.0/(interp2 - interp1)
-                logging.debug('{} coeff {}'.format(self.params[i],coeff))
+#                logging.debug('{} coeff {}'.format(self.params[i],coeff))
 
                 # There will be half as many spectra after this.  
                 new_corners = old_corners[:len(old_corners)/2,1:]
-                # print 'new corners',new_corners
+#                print 'new corners',new_corners
                 new_spectra = {}
                 for cpar in new_corners:
-                    logging.debug('new params {} {}'.format(cpar, type(cpar)))
+#                    logging.debug('new params {} {}'.format(cpar, type(cpar)))
                     ns1 = old_spectra[tuple(np.append(interp1,cpar))]
                     ns2 = old_spectra[tuple(np.append(interp2,cpar))]
 
@@ -400,49 +409,49 @@ class ModelGrid(object):
 
                     new_spectra[tuple(cpar)] = new_flux
 
-                logging.debug(str(new_spectra.keys()))
+#                logging.debug(str(new_spectra.keys()))
                 old_corners = new_corners
                 old_spectra = new_spectra
-                logging.debug('remaining to interp {}'.format(old_spectra.keys()))
+#                logging.debug('remaining to interp {}'.format(old_spectra.keys()))
 
             elif i in single_flags:
                 # No need to interpolate this variable, so skip it and
                 # copy the same spectra to a new dictionary with new indices
                 skip_var = old_corners[0,0]
-                # print i,self.params[i],skip_var
+#                print i,self.params[i],skip_var
                 new_corners = old_corners[:,1:]
-                # print new_corners
+#                print new_corners
                 new_spectra = {}
                 for cpar in new_corners:
                     new_spectra[tuple(cpar)] = old_spectra[tuple(np.append(
                         skip_var,cpar))]
                 old_corners = new_corners
                 old_spectra = new_spectra
-                # print old_spectra.keys()
+#                print old_spectra.keys()
             else:
                 logging.debug('make_model WTF')
         mod_flux = old_spectra[()][0]
-        logging.debug('all done! %d %d', len(mod_flux), len(self.flux))
-        logging.debug('all done! {} {}'.format(type(mod_flux), type(self.flux)))
+#        logging.debug('all done! %d %d', len(mod_flux), len(self.flux))
+#        logging.debug('all done! {} {}'.format(type(mod_flux), type(self.flux)))
 
         # THIS IS WHERE THE CODE TAKES A LONG TIME
         if self.smooth:
-            logging.debug('starting smoothing')
+#            logging.debug('starting smoothing')
             mod_flux = falt2(self.model['wavelength'],mod_flux,resolution) 
-            logging.debug('finished smoothing {}'.format(type(mod_flux)))
-        else:
-            logging.debug('no smoothing')
+#            logging.debug('finished smoothing {}'.format(type(mod_flux)))
+#        else:
+#            logging.debug('no smoothing')
         if self.interp:
-            logging.debug('starting interp')
+#            logging.debug('starting interp')
             mod_flux = np.interp(self.wave,self.model['wavelength'],mod_flux)
-            logging.debug('finished interp')
+#            logging.debug('finished interp')
 
         mod_flux = self.normalize_model(mod_flux)
 
         if type(mod_flux)!=u.quantity.Quantity:
             mod_flux = mod_flux*self.model_flux_units
 
-        logging.debug('returning {}'.format(type(mod_flux)))
+#        logging.debug('returning {}'.format(type(mod_flux)))
         return mod_flux
 
     def normalize_model(self,model_flux,return_ck=False):
@@ -453,17 +462,24 @@ class ModelGrid(object):
         #The model spectra are at some arbitrary luminosity;
         #the scaling factor places this model spectrum at the same
         #apparent luminosity as the observed spectrum.     
-        mult1 = self.flux*model_flux
-        bad = np.isnan(mult1)
-        mult = np.sum(mult1[~bad])
-        sq1 = model_flux**2
-        square = np.sum(sq1[~bad])
-        ck = mult/square
+#         mult1 = self.flux*model_flux
+#         bad = np.isnan(mult1)
+#         mult = np.sum(mult1[~bad])
+#         #print 'mult',mult                                 
+#         sq1 = model_flux**2
+#         square = np.sum(sq1[~bad])
+#         #print 'sq',square                                 
+#         ck = mult/square
+#         #print 'ck',ck                                     
+#         #Applying scaling factor to rescale model flux array
+#         model_flux = model_flux*ck
+#        logging.debug('finished renormalization') 
 
-        #Applying scaling factor to rescale model flux array
+        mult1 = sum(self.flux*model_flux/(self.unc**2))
+        mult = sum(model_flux*model_flux/(self.unc**2))
+        ck = mult1/mult
         model_flux = model_flux*ck
-        logging.debug('finished renormalization') 
-
+        
         if return_ck:
             return model_flux, ck
         else:
@@ -536,12 +552,12 @@ class ModelGrid(object):
         min_distance = 1e10
         matched_i = -99
         for i, mod_params in enumerate(param_arrays):
-            logging.debug("mod_p {} p_val {}".format(mod_params,p_values))
+#            logging.debug("mod_p {} p_val {}".format(mod_params,p_values))
             mod_difference = abs(np.array(mod_params) - np.array(p_values))
             check_distance = np.average(mod_difference)
             if check_distance==min_distance:
-              logging.debug("MULTIPLE MODELS FOUND {}".format(p_values))
-            if check_distance<min_distance:
+                logging.debug("MULTIPLE MODELS FOUND {}".format(p_values))
+            elif check_distance<min_distance:
                 min_distance = check_distance
                 matched_i = i
             else:
@@ -568,7 +584,7 @@ class ModelGrid(object):
         """
 
         p = np.asarray(args)[0]
-        logging.debug('starting params %s',str(p))
+#        logging.debug('starting params %s',str(p))
 
         # p_loc is the location in the model grid that fits all the 
         # constraints up to that point. There aren't constraints yet,
@@ -601,18 +617,15 @@ class ModelGrid(object):
             return mod_flux
 
         if self.smooth:
-            logging.debug('starting smoothing')
+#            logging.debug('starting smoothing')
             mod_flux = falt2(self.model['wavelength'],mod_flux,resolution) 
-            logging.debug('finished smoothing')
-        else:
-            logging.debug('no smoothing')
+#            logging.debug('finished smoothing')
+#        else:
+#            logging.debug('no smoothing')
         if self.interp:
             logging.debug('starting interp {} {} {}'.format(len(self.wave),
                 len(self.model['wavelength']),len(mod_flux)))
-            # This p_loc[0] nesting issue should eventually be dealt with
-            # so it should be moved somewhere else and made a test
-            logging.debug(self.model['wavelength'][p_loc][0])
-            mod_flux = np.interp(self.wave,self.model['wavelength'][p_loc][0],mod_flux)
+            mod_flux = np.interp(self.wave,self.model['wavelength'],mod_flux)
             logging.debug('finished interp')
 
         mod_flux = self.normalize_model(mod_flux)
@@ -620,7 +633,7 @@ class ModelGrid(object):
         if type(mod_flux)!=u.quantity.Quantity:
             mod_flux = mod_flux*self.model_flux_units
 
-        logging.debug('returning {}'.format(type(mod_flux)))
+#        logging.debug('returning {}'.format(type(mod_flux)))
         return mod_flux
 
     def snap_full_run(self,cropchain):
@@ -655,13 +668,13 @@ class ModelGrid(object):
                 for i in range(self.ndim)] for j in range(num_models)]
             for j,p_all in enumerate(cropchain):
                 p = p_all[:self.ndim]
-                logging.debug('starting params %s',str(p))
+#                logging.debug('starting params %s',str(p))
                 p_loc = self.find_nearest2(param_arrays,p)
 
                 for i in range(self.ndim):
-                    logging.debug("i {} p[i] {}".format(i,self.model[self.params[i]][p_loc]))
+#                    logging.debug("i {} p[i] {}".format(i,self.model[self.params[i]][p_loc]))
                     new_cropchain[j,i] = self.model[self.params[i]][p_loc]
-                logging.debug("snapped params {}".format(new_cropchain[j]))
+#                logging.debug("snapped params {}".format(new_cropchain[j]))
             logging.info("Finished snapping chains")
 
         return new_cropchain
