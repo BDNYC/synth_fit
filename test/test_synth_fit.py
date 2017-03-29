@@ -1,2 +1,2 @@
-# from synth_fit.synth_fit import mcmc_fit.py
+import mcmc_fit
 # Getting started with testing for mcmc_fit???
