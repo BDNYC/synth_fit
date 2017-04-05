@@ -1,4 +1,5 @@
 import mcmc_fit
+import pytest
 
 # Getting started with testing for mcmc_fit???
 
