@@ -1,5 +1,5 @@
 from astrodbkit import astrodb
-from SEDkit import utilities as u
+import synth_fit.utilities as u
 import pickle
 import logging
 import cPickle
