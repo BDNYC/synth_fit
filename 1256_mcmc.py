@@ -26,6 +26,13 @@ mg = mc.make_model_db('btsettl', 'model_atmosphere_db', model_grid=models, grid_
                       param_lims=[('teff', 1400, 2000, 50), ('logg', 3.5, 5.5, 0.5)], fill_holes=False, bands=[],
                       rebin_models=w, use_pandas=False)
 
+# Testing to run from calling the database and not a pickle file
+model_atmosphere_db ='/Users/EileenGonzales/Dropbox/BDNYC/BDNYCdb_copy/model_atmospheres.db'
+mg = mc.make_model_db('bt_settl_2013', model_atmosphere_db, model_grid=models, grid_data='spec',
+                      param_lims=[('teff', 1400, 2000, 50), ('logg', 3.5, 5.5, 0.5)], fill_holes=False, bands=[],
+                      rebin_models=w, use_pandas=False)
+# Get same value error. Error with length of Pandas Dataframe?
+
 # This does the actual fitting to the spectra
 bdsamp = mc.fit_spectrum([w, f, e], mg, 'btsettl', 'GJ758B', 25, 50, mask=[], db='', extents=None, object_name='Test',
                          log=False, plot=True, prnt=True, generate=True, outfile=None)
