@@ -129,7 +129,7 @@ def make_model_db(model_grid_name, model_atmosphere_db, model_grid=None, grid_da
 
     # Rebin model spectra or calculate synthetic magnitudes
     if grid_data == 'phot':
-        from SEDkit import syn_phot as s
+        import syn_phot as s
         model_phot = []
         for w, f in zip(list(models['wavelength']), list(models['flux'])):
             model_phot.append(
