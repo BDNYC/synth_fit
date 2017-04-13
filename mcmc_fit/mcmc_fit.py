@@ -296,14 +296,16 @@ def fit_spectrum(raw_spectrum, model_grid, model_grid_name, shortname, walkers, 
     if plot:
         bdsamp.plot_triangle(extents=extents)
         fig = plt.gcf()
-        fig = plt.savefig('/Users/Dropbox/BDNYC/BDNYC_Research/Python/Modules/synth_fit/my_plots/{}_{}'
-                          .format(model_grid_name, shortname) + '_triangle.eps')
+#         fig = plt.savefig('/Users/Dropbox/BDNYC/BDNYC_Research/Python/Modules/synth_fit/my_plots/{}_{}'
+#                           .format(model_grid_name, shortname) + '_triangle.eps')
+        fig = plt.savefig('/Users/paigegiorla/Desktop/triangle.eps')
         fig = plt.clf()
 
         bdsamp.plot_chains()
         fig = plt.gcf()
-        fig = plt.savefig('/Users/Dropbox/BDNYC/BDNYC_Research/Python/Modules/synth_fit/my_plots/{}_{}'
-                          .format(model_grid_name, shortname) + '_chains.eps')
+#         fig = plt.savefig('/Users/Dropbox/BDNYC/BDNYC_Research/Python/Modules/synth_fit/my_plots/{}_{}'
+#                           .format(model_grid_name, shortname) + '_chains.eps')
+        fig = plt.savefig('/Users/paigegiorla/Desktop/chains.eps')
         fig = plt.clf()
 
     # Printing
@@ -322,13 +324,15 @@ def fit_spectrum(raw_spectrum, model_grid, model_grid_name, shortname, walkers, 
     params_with_unc = bdsamp.get_error_and_unc()
 
     # Save chain and text file
-    fb = open('/Users/Dropbox/BDNYC/BDNYC_Research/Python/Modules/synth_fit/my_plots/{}_{}'
-              .format(model_grid_name, shortname) + '_bdsamp.txt', 'wb')
+#     fb = open('/Users/Dropbox/BDNYC/BDNYC_Research/Python/Modules/synth_fit/my_plots/{}_{}'
+#               .format(model_grid_name, shortname) + '_bdsamp.txt', 'wb')
+    fb = open('/Users/paigegiorla/Desktop/bdsamp.txt','wb')
     pickle.dump(
         [bdsamp.start_p, bdsamp.all_params, bdsamp.all_quantiles.T[1], bdsamp.best_fit_spectrum, params_with_unc], fb)
     fb.close()
-    fb = open('/Users/Dropbox/BDNYC/BDNYC_Research/Python/Modules/synth_fit/my_plots/{}_{}'
-              .format(model_grid_name, shortname) + '_chain.pkl', 'wb')
+#     fb = open('/Users/Dropbox/BDNYC/BDNYC_Research/Python/Modules/synth_fit/my_plots/{}_{}'
+#               .format(model_grid_name, shortname) + '_chain.pkl', 'wb')
+    fb = open('/Users/paigegiorla/Desktop/chain.pkl','wb')
     pickle.dump(bdsamp.chain, fb)
     fb.close()
 
@@ -358,8 +362,9 @@ def fit_spectrum(raw_spectrum, model_grid, model_grid_name, shortname, walkers, 
     plt.xlim(min(w) - min(w) * 0.01, max(w) + max(w) * 0.01)
     plt.xlabel('Wavelength ($\mu$m)')
     plt.ylabel('Normalized Flux')
-    plt.savefig('/Users/Dropbox/BDNYC/BDNYC_Research/Python/Modules/synth_fit/my_plots/{}_{}'
-                .format(model_grid_name, shortname) + '_bestfit.eps')
+#     plt.savefig('/Users/Dropbox/BDNYC/BDNYC_Research/Python/Modules/synth_fit/my_plots/{}_{}'
+#                 .format(model_grid_name, shortname) + '_bestfit.eps')
+    plt.savefig('/Users/paigegiorla/Desktop/bestfit.eps')
     plt.clf()
 
     return bdsamp
