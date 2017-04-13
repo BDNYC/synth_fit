@@ -15,7 +15,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
 import emcee
 
-from plotting import emcee_plot
+from plotting.emcee_plot import emcee_plot
 # https://github.com/adrn/streams/blob/master/streams/plot/emcee.py
 # Want to update ^ so it shows the burn_in cut
 from plotting import triangle
